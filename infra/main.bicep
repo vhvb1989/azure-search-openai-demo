@@ -21,7 +21,6 @@ param storageAccountName string = ''
 param storageContainerName string = 'content'
 
 param openAiServiceName string = ''
-param openAiResourceGroupName string = ''
 
 param formRecognizerServiceName string = ''
 
@@ -227,7 +226,6 @@ output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 
 output AZURE_OPENAI_SERVICE string = openAiServiceName
-output AZURE_OPENAI_RESOURCE_GROUP string = openAiResourceGroupName
 
 output AZURE_FORMRECOGNIZER_SERVICE string = formRecognizer.outputs.name
 
