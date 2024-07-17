@@ -35,6 +35,12 @@ jobs:
         with:
           python-version: "3.x"
           architecture: "x64"
+      
+      - name: Set environment name with workflow id
+        id: set_env_name
+        run: |
+          azure_env_name="${{ vars.AZURE_ENV_NAME }}-${{ github.run_id }}"
+          echo "AZURE_ENV_NAME=$azure_env_name" >> $GITHUB_ENV
 
       - name: Log in with Azure (Federated Credentials)
         if: ${{ env.AZURE_CLIENT_ID != '' }}
@@ -48,7 +54,10 @@ jobs:
       - name: Run azd up
         run: azd up --no-prompt
         env:
+          AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
           AZURE_DOCUMENTINTELLIGENCE_LOCATION: ${{ vars.AZURE_DOCUMENTINTELLIGENCE_LOCATION }}
+        continue-on-error: true
 
       - name: Run azd down
         run: azd down --force --purge
+        continue-on-error: true
