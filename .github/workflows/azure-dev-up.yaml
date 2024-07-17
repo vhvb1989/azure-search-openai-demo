@@ -60,4 +60,7 @@ jobs:
 
       - name: Run azd down
         run: azd down --force --purge
+        env:
+          AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
+          AZURE_DOCUMENTINTELLIGENCE_LOCATION: ${{ vars.AZURE_DOCUMENTINTELLIGENCE_LOCATION }}
         continue-on-error: true
