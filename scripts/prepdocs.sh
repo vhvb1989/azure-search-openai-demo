@@ -89,4 +89,4 @@ $adlsGen2StorageAccountArg $adlsGen2FilesystemArg $adlsGen2FilesystemPathArg \
 $tenantArg $aclArg \
 $disableVectorsArg $localPdfParserArg $localHtmlParserArg \
 $integratedVectorizationArg \
-$additionalArgs
+$additionalArgs 
