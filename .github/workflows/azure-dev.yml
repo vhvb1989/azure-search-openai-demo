@@ -136,11 +136,8 @@ jobs:
         env:
           AZD_INITIAL_ENVIRONMENT_CONFIG: ${{ secrets.AZD_INITIAL_ENVIRONMENT_CONFIG }}
 
-      - name: Provision Infrastructure
-        run: azd up --no-prompt
-        env:
-          AZURE_SERVER_APP_SECRET: ${{ secrets.AZURE_SERVER_APP_SECRET }}
-          AZURE_CLIENT_APP_SECRET: ${{ secrets.AZURE_CLIENT_APP_SECRET }}
+      - name: tok
+        run: azd auth token -o json
 
-      - name: Deploy Application
-        run: azd deploy --no-prompt
+      - name: tok2
+        run: azd auth token -o json        
