@@ -129,7 +129,7 @@ jobs:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: create azd env
-        run: azd env refresh -e $AZURE_ENV_NAME
+        run: azd env refresh -e $AZURE_ENV_NAME --no-prompt
 
       - name: Provision Infrastructure
         run: azd provision --no-prompt --debug
