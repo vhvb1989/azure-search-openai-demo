@@ -129,12 +129,9 @@ jobs:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: create azd env
-        run: azd env refresh -e $AZURE_ENV_NAME --no-prompt
+        run: azd env new -e $AZURE_ENV_NAME --no-prompt
         env:
           AZD_INITIAL_ENVIRONMENT_CONFIG: ${{ secrets.AZD_INITIAL_ENVIRONMENT_CONFIG }}
-
-      - name: create azd env
-        run: azd down --force --purge          
 
       - name: Provision Infrastructure
         run: azd provision --no-prompt --debug --no-state
