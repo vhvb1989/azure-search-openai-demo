@@ -30,11 +30,6 @@ jobs:
       - name: Install azd
         uses: Azure/setup-azd@v1.0.0
 
-      - name: Create azd env
-        run: azd env new $AZURE_ENV_NAME --no-prompt
-        env:
-          AZD_INITIAL_ENVIRONMENT_CONFIG: ${{ secrets.AZD_INITIAL_ENVIRONMENT_CONFIG }}
-
       - name: Log in with Azure (Federated Credentials)
         if: ${{ env.AZURE_CLIENT_ID != '' }}
         run: |
@@ -43,6 +38,14 @@ jobs:
             --federated-credential-provider "github" `
             --tenant-id "$Env:AZURE_TENANT_ID"
         shell: pwsh
+
+      # Creating azd environment is a temp workaround for
+      # https://github.com/Azure/azure-dev/issues/3920
+      # To be removed once the issue is fixed
+      - name: Create azd env
+        run: azd env new $AZURE_ENV_NAME --no-prompt
+        env:
+          AZD_INITIAL_ENVIRONMENT_CONFIG: ${{ secrets.AZD_INITIAL_ENVIRONMENT_CONFIG }}
 
       - name: Run azd up
         run: azd up --no-prompt
