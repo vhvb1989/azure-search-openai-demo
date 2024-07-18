@@ -29,18 +29,11 @@ jobs:
 
       - name: Install azd
         uses: Azure/setup-azd@v1.0.0
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-          architecture: "x64"
-      
-      - name: Set environment name with workflow id
-        id: set_env_name
-        run: |
-          azure_env_name="${{ vars.AZURE_ENV_NAME }}-${{ github.run_id }}"
-          echo "AZURE_ENV_NAME=$azure_env_name" >> $GITHUB_ENV
+
+      - name: Create azd env
+        run: azd env new $AZURE_ENV_NAME --no-prompt
+        env:
+          AZD_INITIAL_ENVIRONMENT_CONFIG: ${{ secrets.AZD_INITIAL_ENVIRONMENT_CONFIG }}
 
       - name: Log in with Azure (Federated Credentials)
         if: ${{ env.AZURE_CLIENT_ID != '' }}
