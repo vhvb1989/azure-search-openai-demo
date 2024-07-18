@@ -128,6 +128,9 @@ jobs:
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: create azd env
+        run: azd env refresh -e $AZURE_ENV_NAME
+
       - name: Provision Infrastructure
         run: azd provision --no-prompt --debug
         env:
