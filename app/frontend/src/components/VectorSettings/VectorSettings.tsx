@@ -1,78 +1,134 @@
 import { useEffect, useState } from "react";
-import { Stack, IDropdownOption, Dropdown, IDropdownProps } from "@fluentui/react";
+import { Stack, IDropdownOption, Dropdown, Checkbox, IDropdownProps } from "@fluentui/react";
 import { useId } from "@fluentui/react-hooks";
+import { useTranslation } from "react-i18next";
 
 import styles from "./VectorSettings.module.css";
 import { HelpCallout } from "../../components/HelpCallout";
-import { RetrievalMode, VectorFieldOptions } from "../../api";
-import { toolTipText } from "../../i18n/tooltips.js";
+import { RetrievalMode } from "../../api";
 
 interface Props {
     showImageOptions?: boolean;
     defaultRetrievalMode: RetrievalMode;
+    defaultSearchTextEmbeddings?: boolean;
+    defaultSearchImageEmbeddings?: boolean;
     updateRetrievalMode: (retrievalMode: RetrievalMode) => void;
-    updateVectorFields: (options: VectorFieldOptions[]) => void;
+    updateSearchTextEmbeddings: (searchTextEmbeddings: boolean) => void;
+    updateSearchImageEmbeddings: (searchImageEmbeddings: boolean) => void;
 }
 
-export const VectorSettings = ({ updateRetrievalMode, updateVectorFields, showImageOptions, defaultRetrievalMode }: Props) => {
-    const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(RetrievalMode.Hybrid);
-    const [vectorFieldOption, setVectorFieldOption] = useState<VectorFieldOptions>(VectorFieldOptions.Both);
+export const VectorSettings = ({
+    updateRetrievalMode,
+    updateSearchTextEmbeddings,
+    updateSearchImageEmbeddings,
+    showImageOptions,
+    defaultRetrievalMode,
+    defaultSearchTextEmbeddings = true,
+    defaultSearchImageEmbeddings = true
+}: Props) => {
+    const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(defaultRetrievalMode || RetrievalMode.Hybrid);
+    const [searchTextEmbeddings, setSearchTextEmbeddings] = useState<boolean>(defaultSearchTextEmbeddings);
+    const [searchImageEmbeddings, setSearchImageEmbeddings] = useState<boolean>(defaultSearchImageEmbeddings);
 
     const onRetrievalModeChange = (_ev: React.FormEvent<HTMLDivElement>, option?: IDropdownOption<RetrievalMode> | undefined) => {
         setRetrievalMode(option?.data || RetrievalMode.Hybrid);
         updateRetrievalMode(option?.data || RetrievalMode.Hybrid);
     };
 
-    const onVectorFieldsChange = (_ev: React.FormEvent<HTMLDivElement>, option?: IDropdownOption<RetrievalMode> | undefined) => {
-        setVectorFieldOption(option?.key as VectorFieldOptions);
-        updateVectorFields([option?.key as VectorFieldOptions]);
+    const onSearchTextEmbeddingsChange = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
+        setSearchTextEmbeddings(checked || false);
+        updateSearchTextEmbeddings(checked || false);
     };
 
+    const onSearchImageEmbeddingsChange = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
+        setSearchImageEmbeddings(checked || false);
+        updateSearchImageEmbeddings(checked || false);
+    };
+
+    // Only run if showImageOptions changes from true to false or false to true
     useEffect(() => {
-        showImageOptions
-            ? updateVectorFields([VectorFieldOptions.Embedding, VectorFieldOptions.ImageEmbedding])
-            : updateVectorFields([VectorFieldOptions.Embedding]);
-    }, [showImageOptions]);
+        if (!showImageOptions) {
+            // If images are disabled, we must disable image embeddings
+            setSearchImageEmbeddings(false);
+            updateSearchImageEmbeddings(false);
+        } else {
+            // When image options become available, reset to default
+            setSearchImageEmbeddings(defaultSearchImageEmbeddings);
+            updateSearchImageEmbeddings(defaultSearchImageEmbeddings);
+        }
+    }, [showImageOptions, updateSearchImageEmbeddings, defaultSearchImageEmbeddings]);
 
     const retrievalModeId = useId("retrievalMode");
     const retrievalModeFieldId = useId("retrievalModeField");
     const vectorFieldsId = useId("vectorFields");
     const vectorFieldsFieldId = useId("vectorFieldsField");
+    const { t } = useTranslation();
 
     return (
         <Stack className={styles.container} tokens={{ childrenGap: 10 }}>
             <Dropdown
                 id={retrievalModeFieldId}
-                label="Retrieval mode"
-                selectedKey={defaultRetrievalMode.toString()}
+                label={t("labels.retrievalMode.label")}
+                selectedKey={retrievalMode.toString()}
                 options={[
-                    { key: "hybrid", text: "Vectors + Text (Hybrid)", selected: retrievalMode == RetrievalMode.Hybrid, data: RetrievalMode.Hybrid },
-                    { key: "vectors", text: "Vectors", selected: retrievalMode == RetrievalMode.Vectors, data: RetrievalMode.Vectors },
-                    { key: "text", text: "Text", selected: retrievalMode == RetrievalMode.Text, data: RetrievalMode.Text }
+                    {
+                        key: "hybrid",
+                        text: t("labels.retrievalMode.options.hybrid"),
+                        selected: retrievalMode == RetrievalMode.Hybrid,
+                        data: RetrievalMode.Hybrid
+                    },
+                    {
+                        key: "vectors",
+                        text: t("labels.retrievalMode.options.vectors"),
+                        selected: retrievalMode == RetrievalMode.Vectors,
+                        data: RetrievalMode.Vectors
+                    },
+                    { key: "text", text: t("labels.retrievalMode.options.texts"), selected: retrievalMode == RetrievalMode.Text, data: RetrievalMode.Text }
                 ]}
                 required
                 onChange={onRetrievalModeChange}
                 aria-labelledby={retrievalModeId}
                 onRenderLabel={(props: IDropdownProps | undefined) => (
-                    <HelpCallout labelId={retrievalModeId} fieldId={retrievalModeFieldId} helpText={toolTipText.retrievalMode} label={props?.label} />
+                    <HelpCallout labelId={retrievalModeId} fieldId={retrievalModeFieldId} helpText={t("helpTexts.retrievalMode")} label={props?.label} />
                 )}
             />
 
             {showImageOptions && [RetrievalMode.Vectors, RetrievalMode.Hybrid].includes(retrievalMode) && (
-                <Dropdown
-                    id={vectorFieldsFieldId}
-                    label="Vector fields (Multi-query vector search)"
-                    options={[
-                        { key: VectorFieldOptions.Embedding, text: "Text Embeddings", selected: vectorFieldOption === VectorFieldOptions.Embedding },
-                        { key: VectorFieldOptions.ImageEmbedding, text: "Image Embeddings", selected: vectorFieldOption === VectorFieldOptions.ImageEmbedding },
-                        { key: VectorFieldOptions.Both, text: "Text and Image embeddings", selected: vectorFieldOption === VectorFieldOptions.Both }
-                    ]}
-                    onChange={onVectorFieldsChange}
-                    aria-labelledby={vectorFieldsId}
-                    onRenderLabel={(props: IDropdownProps | undefined) => (
-                        <HelpCallout labelId={vectorFieldsId} fieldId={vectorFieldsFieldId} helpText={toolTipText.vectorFields} label={props?.label} />
-                    )}
-                />
+                <fieldset className={styles.fieldset}>
+                    <legend className={styles.legend}>{t("labels.vector.label")}</legend>
+                    <Stack tokens={{ childrenGap: 8 }}>
+                        <Checkbox
+                            id={vectorFieldsFieldId + "-text"}
+                            label={t("labels.vector.options.embedding")}
+                            checked={searchTextEmbeddings}
+                            onChange={onSearchTextEmbeddingsChange}
+                            aria-labelledby={vectorFieldsId + "-text"}
+                            onRenderLabel={props => (
+                                <HelpCallout
+                                    labelId={vectorFieldsId + "-text"}
+                                    fieldId={vectorFieldsFieldId + "-text"}
+                                    helpText={t("helpTexts.textEmbeddings")}
+                                    label={props?.label}
+                                />
+                            )}
+                        />
+                        <Checkbox
+                            id={vectorFieldsFieldId + "-image"}
+                            label={t("labels.vector.options.imageEmbedding")}
+                            checked={searchImageEmbeddings}
+                            onChange={onSearchImageEmbeddingsChange}
+                            aria-labelledby={vectorFieldsId + "-image"}
+                            onRenderLabel={props => (
+                                <HelpCallout
+                                    labelId={vectorFieldsId + "-image"}
+                                    fieldId={vectorFieldsFieldId + "-image"}
+                                    helpText={t("helpTexts.imageEmbeddings")}
+                                    label={props?.label}
+                                />
+                            )}
+                        />
+                    </Stack>
+                </fieldset>
             )}
         </Stack>
     );

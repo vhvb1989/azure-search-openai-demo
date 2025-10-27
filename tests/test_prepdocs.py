@@ -1,4 +1,5 @@
 import logging
+from unittest.mock import AsyncMock
 
 import openai
 import openai.types
@@ -9,6 +10,7 @@ from openai.types.create_embedding_response import Usage
 
 from prepdocslib.embeddings import (
     AzureOpenAIEmbeddingService,
+    ImageEmbeddings,
     OpenAIEmbeddingService,
 )
 
@@ -51,7 +53,7 @@ async def test_compute_embedding_success(monkeypatch):
                             object="embedding",
                         )
                     ],
-                    model="text-embedding-ada-002",
+                    model="text-embedding-3-large",
                     usage=Usage(prompt_tokens=8, total_tokens=8),
                 )
             )
@@ -62,6 +64,7 @@ async def test_compute_embedding_success(monkeypatch):
         open_ai_deployment="x",
         open_ai_model_name=MOCK_EMBEDDING_MODEL_NAME,
         open_ai_dimensions=MOCK_EMBEDDING_DIMENSIONS,
+        open_ai_api_version="test-api-version",
         credential=MockAzureCredential(),
         disable_batch=False,
     )
@@ -79,6 +82,7 @@ async def test_compute_embedding_success(monkeypatch):
         open_ai_deployment="x",
         open_ai_model_name=MOCK_EMBEDDING_MODEL_NAME,
         open_ai_dimensions=MOCK_EMBEDDING_DIMENSIONS,
+        open_ai_api_version="test-api-version",
         credential=MockAzureCredential(),
         disable_batch=True,
     )
@@ -149,6 +153,7 @@ async def test_compute_embedding_ratelimiterror_batch(monkeypatch, caplog):
                 open_ai_deployment="x",
                 open_ai_model_name=MOCK_EMBEDDING_MODEL_NAME,
                 open_ai_dimensions=MOCK_EMBEDDING_DIMENSIONS,
+                open_ai_api_version="test-api-version",
                 credential=MockAzureCredential(),
                 disable_batch=False,
             )
@@ -167,6 +172,7 @@ async def test_compute_embedding_ratelimiterror_single(monkeypatch, caplog):
                 open_ai_deployment="x",
                 open_ai_model_name=MOCK_EMBEDDING_MODEL_NAME,
                 open_ai_dimensions=MOCK_EMBEDDING_DIMENSIONS,
+                open_ai_api_version="test-api-version",
                 credential=MockAzureCredential(),
                 disable_batch=True,
             )
@@ -193,6 +199,7 @@ async def test_compute_embedding_autherror(monkeypatch, capsys):
             open_ai_deployment="x",
             open_ai_model_name=MOCK_EMBEDDING_MODEL_NAME,
             open_ai_dimensions=MOCK_EMBEDDING_DIMENSIONS,
+            open_ai_api_version="test-api-version",
             credential=MockAzureCredential(),
             disable_batch=False,
         )
@@ -205,8 +212,39 @@ async def test_compute_embedding_autherror(monkeypatch, capsys):
             open_ai_deployment="x",
             open_ai_model_name=MOCK_EMBEDDING_MODEL_NAME,
             open_ai_dimensions=MOCK_EMBEDDING_DIMENSIONS,
+            open_ai_api_version="test-api-version",
             credential=MockAzureCredential(),
             disable_batch=True,
         )
         monkeypatch.setattr(embeddings, "create_client", create_auth_error_limit_client)
         await embeddings.create_embeddings(texts=["foo"])
+
+
+@pytest.mark.asyncio
+async def test_image_embeddings_success(mock_azurehttp_calls):
+    mock_token_provider = AsyncMock(return_value="fake_token")
+
+    # Create the ImageEmbeddings instance
+    image_embeddings = ImageEmbeddings(
+        endpoint="https://fake-endpoint.azure.com/",
+        token_provider=mock_token_provider,
+    )
+
+    # Call the create_embedding method with fake image bytes
+    image_bytes = b"fake_image_data"
+    embedding = await image_embeddings.create_embedding_for_image(image_bytes)
+
+    # Verify the result
+    assert embedding == [
+        0.011925711,
+        0.023533698,
+        0.010133852,
+        0.0063544377,
+        -0.00038590943,
+        0.0013952175,
+        0.009054946,
+        -0.033573493,
+        -0.002028305,
+    ]
+
+    mock_token_provider.assert_called_once()

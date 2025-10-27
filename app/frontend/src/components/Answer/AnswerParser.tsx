@@ -1,16 +1,17 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { getCitationFilePath } from "../../api";
+import { ChatAppResponse, getCitationFilePath } from "../../api";
 
 type HtmlParsedAnswer = {
     answerHtml: string;
     citations: string[];
 };
 
-export function parseAnswerToHtml(answer: string, isStreaming: boolean, onCitationClicked: (citationFilePath: string) => void): HtmlParsedAnswer {
+export function parseAnswerToHtml(answer: ChatAppResponse, isStreaming: boolean, onCitationClicked: (citationFilePath: string) => void): HtmlParsedAnswer {
+    const possibleCitations = answer.context.data_points.citations || [];
     const citations: string[] = [];
 
-    // trim any whitespace from the end of the answer after removing follow-up questions
-    let parsedAnswer = answer.trim();
+    // Trim any whitespace from the end of the answer after removing follow-up questions
+    let parsedAnswer = answer.message.content.trim();
 
     // Omit a citation that is still being typed during streaming
     if (isStreaming) {
@@ -34,6 +35,15 @@ export function parseAnswerToHtml(answer: string, isStreaming: boolean, onCitati
             return part;
         } else {
             let citationIndex: number;
+
+            const isValidCitation = possibleCitations.some(citation => {
+                return citation.startsWith(part);
+            });
+
+            if (!isValidCitation) {
+                return `[${part}]`;
+            }
+
             if (citations.indexOf(part) !== -1) {
                 citationIndex = citations.indexOf(part) + 1;
             } else {

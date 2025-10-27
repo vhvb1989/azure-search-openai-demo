@@ -1,25 +1,23 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { Checkbox, Panel, DefaultButton, Spinner, TextField, ICheckboxProps, ITextFieldProps } from "@fluentui/react";
-import { useId } from "@fluentui/react-hooks";
+import { useTranslation } from "react-i18next";
+import { Helmet } from "react-helmet-async";
+import { Panel, DefaultButton, Spinner } from "@fluentui/react";
 
 import styles from "./Ask.module.css";
 
-import { askApi, configApi, getSpeechApi, ChatAppResponse, ChatAppRequest, RetrievalMode, VectorFieldOptions, GPT4VInput } from "../../api";
+import { askApi, configApi, ChatAppResponse, ChatAppRequest, RetrievalMode, SpeechConfig } from "../../api";
 import { Answer, AnswerError } from "../../components/Answer";
 import { QuestionInput } from "../../components/QuestionInput";
 import { ExampleList } from "../../components/Example";
 import { AnalysisPanel, AnalysisPanelTabs } from "../../components/AnalysisPanel";
-import { HelpCallout } from "../../components/HelpCallout";
 import { SettingsButton } from "../../components/SettingsButton/SettingsButton";
-import { useLogin, getToken, requireAccessControl, checkLoggedIn } from "../../authConfig";
-import { VectorSettings } from "../../components/VectorSettings";
-import { GPT4VSettings } from "../../components/GPT4VSettings";
-import { toolTipText } from "../../i18n/tooltips.js";
+import { useLogin, getToken, requireAccessControl } from "../../authConfig";
 import { UploadFile } from "../../components/UploadFile";
-
+import { Settings } from "../../components/Settings/Settings";
 import { useMsal } from "@azure/msal-react";
 import { TokenClaimsDisplay } from "../../components/TokenClaimsDisplay";
 import { LoginContext } from "../../loginContext";
+import { LanguagePicker } from "../../i18n/LanguagePicker";
 
 export function Component(): JSX.Element {
     const [isConfigPanelOpen, setIsConfigPanelOpen] = useState(false);
@@ -27,33 +25,56 @@ export function Component(): JSX.Element {
     const [promptTemplatePrefix, setPromptTemplatePrefix] = useState<string>("");
     const [promptTemplateSuffix, setPromptTemplateSuffix] = useState<string>("");
     const [temperature, setTemperature] = useState<number>(0.3);
+    const [seed, setSeed] = useState<number | null>(null);
     const [minimumRerankerScore, setMinimumRerankerScore] = useState<number>(0);
     const [minimumSearchScore, setMinimumSearchScore] = useState<number>(0);
     const [retrievalMode, setRetrievalMode] = useState<RetrievalMode>(RetrievalMode.Hybrid);
     const [retrieveCount, setRetrieveCount] = useState<number>(3);
+    const [resultsMergeStrategy, setResultsMergeStrategy] = useState<string>("interleaved");
     const [useSemanticRanker, setUseSemanticRanker] = useState<boolean>(true);
     const [useSemanticCaptions, setUseSemanticCaptions] = useState<boolean>(false);
-    const [useGPT4V, setUseGPT4V] = useState<boolean>(false);
-    const [gpt4vInput, setGPT4VInput] = useState<GPT4VInput>(GPT4VInput.TextAndImages);
+    const [useQueryRewriting, setUseQueryRewriting] = useState<boolean>(false);
+    const [reasoningEffort, setReasoningEffort] = useState<string>("");
+    const [sendTextSources, setSendTextSources] = useState<boolean>(true);
+    const [sendImageSources, setSendImageSources] = useState<boolean>(false);
+    const [includeCategory, setIncludeCategory] = useState<string>("");
+
     const [excludeCategory, setExcludeCategory] = useState<string>("");
     const [question, setQuestion] = useState<string>("");
-    const [vectorFieldList, setVectorFieldList] = useState<VectorFieldOptions[]>([VectorFieldOptions.Embedding, VectorFieldOptions.ImageEmbedding]);
+    const [searchTextEmbeddings, setSearchTextEmbeddings] = useState<boolean>(true);
+    const [searchImageEmbeddings, setSearchImageEmbeddings] = useState<boolean>(false);
     const [useOidSecurityFilter, setUseOidSecurityFilter] = useState<boolean>(false);
     const [useGroupsSecurityFilter, setUseGroupsSecurityFilter] = useState<boolean>(false);
-    const [showGPT4VOptions, setShowGPT4VOptions] = useState<boolean>(false);
+    const [showMultimodalOptions, setShowMultimodalOptions] = useState<boolean>(false);
     const [showSemanticRankerOption, setShowSemanticRankerOption] = useState<boolean>(false);
+    const [showQueryRewritingOption, setShowQueryRewritingOption] = useState<boolean>(false);
+    const [showReasoningEffortOption, setShowReasoningEffortOption] = useState<boolean>(false);
     const [showVectorOption, setShowVectorOption] = useState<boolean>(false);
     const [showUserUpload, setShowUserUpload] = useState<boolean>(false);
+    const [showLanguagePicker, setshowLanguagePicker] = useState<boolean>(false);
     const [showSpeechInput, setShowSpeechInput] = useState<boolean>(false);
     const [showSpeechOutputBrowser, setShowSpeechOutputBrowser] = useState<boolean>(false);
     const [showSpeechOutputAzure, setShowSpeechOutputAzure] = useState<boolean>(false);
+    const audio = useRef(new Audio()).current;
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [showAgenticRetrievalOption, setShowAgenticRetrievalOption] = useState<boolean>(false);
+    const [useAgenticRetrieval, setUseAgenticRetrieval] = useState<boolean>(false);
 
     const lastQuestionRef = useRef<string>("");
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<unknown>();
     const [answer, setAnswer] = useState<ChatAppResponse>();
-    const [speechUrl, setSpeechUrl] = useState<string | null>(null);
+    // For the Ask tab, this array will hold a maximum of one URL
+    const [speechUrls, setSpeechUrls] = useState<(string | null)[]>([]);
+
+    const speechConfig: SpeechConfig = {
+        speechUrls,
+        setSpeechUrls,
+        audio,
+        isPlaying,
+        setIsPlaying
+    };
 
     const [activeCitation, setActiveCitation] = useState<string>();
     const [activeAnalysisPanelTab, setActiveAnalysisPanelTab] = useState<AnalysisPanelTabs | undefined>(undefined);
@@ -63,31 +84,42 @@ export function Component(): JSX.Element {
 
     const getConfig = async () => {
         configApi().then(config => {
-            setShowGPT4VOptions(config.showGPT4VOptions);
+            setShowMultimodalOptions(config.showMultimodalOptions);
+            if (config.showMultimodalOptions) {
+                // Initialize from server config so defaults follow deployment settings
+                setSendTextSources(config.ragSendTextSources !== undefined ? config.ragSendTextSources : true);
+                setSendImageSources(config.ragSendImageSources);
+                setSearchTextEmbeddings(config.ragSearchTextEmbeddings);
+                setSearchImageEmbeddings(config.ragSearchImageEmbeddings);
+            }
             setUseSemanticRanker(config.showSemanticRankerOption);
             setShowSemanticRankerOption(config.showSemanticRankerOption);
+            setUseQueryRewriting(config.showQueryRewritingOption);
+            setShowQueryRewritingOption(config.showQueryRewritingOption);
+            setShowReasoningEffortOption(config.showReasoningEffortOption);
+            if (config.showReasoningEffortOption) {
+                setReasoningEffort(config.defaultReasoningEffort);
+            }
             setShowVectorOption(config.showVectorOption);
             if (!config.showVectorOption) {
                 setRetrievalMode(RetrievalMode.Text);
             }
             setShowUserUpload(config.showUserUpload);
+            setshowLanguagePicker(config.showLanguagePicker);
             setShowSpeechInput(config.showSpeechInput);
             setShowSpeechOutputBrowser(config.showSpeechOutputBrowser);
             setShowSpeechOutputAzure(config.showSpeechOutputAzure);
+            setShowAgenticRetrievalOption(config.showAgenticRetrievalOption);
+            setUseAgenticRetrieval(config.showAgenticRetrievalOption);
+            if (config.showAgenticRetrievalOption) {
+                setRetrieveCount(10);
+            }
         });
     };
 
     useEffect(() => {
         getConfig();
     }, []);
-
-    useEffect(() => {
-        if (answer && showSpeechOutputAzure) {
-            getSpeechApi(answer.message.content).then(speechUrl => {
-                setSpeechUrl(speechUrl);
-            });
-        }
-    }, [answer]);
 
     const makeApiRequest = async (question: string) => {
         lastQuestionRef.current = question;
@@ -112,19 +144,27 @@ export function Component(): JSX.Element {
                         prompt_template: promptTemplate.length === 0 ? undefined : promptTemplate,
                         prompt_template_prefix: promptTemplatePrefix.length === 0 ? undefined : promptTemplatePrefix,
                         prompt_template_suffix: promptTemplateSuffix.length === 0 ? undefined : promptTemplateSuffix,
+                        include_category: includeCategory.length === 0 ? undefined : includeCategory,
                         exclude_category: excludeCategory.length === 0 ? undefined : excludeCategory,
                         top: retrieveCount,
+                        results_merge_strategy: resultsMergeStrategy,
                         temperature: temperature,
                         minimum_reranker_score: minimumRerankerScore,
                         minimum_search_score: minimumSearchScore,
                         retrieval_mode: retrievalMode,
                         semantic_ranker: useSemanticRanker,
                         semantic_captions: useSemanticCaptions,
+                        query_rewriting: useQueryRewriting,
+                        reasoning_effort: reasoningEffort,
                         use_oid_security_filter: useOidSecurityFilter,
                         use_groups_security_filter: useGroupsSecurityFilter,
-                        vector_fields: vectorFieldList,
-                        use_gpt4v: useGPT4V,
-                        gpt4v_input: gpt4vInput
+                        search_text_embeddings: searchTextEmbeddings,
+                        search_image_embeddings: searchImageEmbeddings,
+                        send_text_sources: sendTextSources,
+                        send_image_sources: sendImageSources,
+                        language: i18n.language,
+                        use_agentic_retrieval: useAgenticRetrieval,
+                        ...(seed !== null ? { seed: seed } : {})
                     }
                 },
                 // AI Chat Protocol: Client must pass on any session state received from the server
@@ -132,7 +172,7 @@ export function Component(): JSX.Element {
             };
             const result = await askApi(request, token);
             setAnswer(result);
-            setSpeechUrl(null);
+            setSpeechUrls([null]);
         } catch (e) {
             setError(e);
         } finally {
@@ -140,35 +180,79 @@ export function Component(): JSX.Element {
         }
     };
 
-    const onPromptTemplateChange = (_ev?: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string) => {
-        setPromptTemplate(newValue || "");
-    };
-
-    const onTemperatureChange = (_ev?: React.SyntheticEvent<HTMLElement, Event>, newValue?: string) => {
-        setTemperature(parseFloat(newValue || "0"));
-    };
-
-    const onMinimumSearchScoreChange = (_ev?: React.SyntheticEvent<HTMLElement, Event>, newValue?: string) => {
-        setMinimumSearchScore(parseFloat(newValue || "0"));
-    };
-
-    const onMinimumRerankerScoreChange = (_ev?: React.SyntheticEvent<HTMLElement, Event>, newValue?: string) => {
-        setMinimumRerankerScore(parseFloat(newValue || "0"));
-    };
-    const onRetrieveCountChange = (_ev?: React.SyntheticEvent<HTMLElement, Event>, newValue?: string) => {
-        setRetrieveCount(parseInt(newValue || "3"));
-    };
-
-    const onUseSemanticRankerChange = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
-        setUseSemanticRanker(!!checked);
-    };
-
-    const onUseSemanticCaptionsChange = (_ev?: React.FormEvent<HTMLElement | HTMLInputElement>, checked?: boolean) => {
-        setUseSemanticCaptions(!!checked);
-    };
-
-    const onExcludeCategoryChanged = (_ev?: React.FormEvent, newValue?: string) => {
-        setExcludeCategory(newValue || "");
+    const handleSettingsChange = (field: string, value: any) => {
+        switch (field) {
+            case "promptTemplate":
+                setPromptTemplate(value);
+                break;
+            case "promptTemplatePrefix":
+                setPromptTemplatePrefix(value);
+                break;
+            case "promptTemplateSuffix":
+                setPromptTemplateSuffix(value);
+                break;
+            case "temperature":
+                setTemperature(value);
+                break;
+            case "seed":
+                setSeed(value);
+                break;
+            case "minimumRerankerScore":
+                setMinimumRerankerScore(value);
+                break;
+            case "minimumSearchScore":
+                setMinimumSearchScore(value);
+                break;
+            case "retrieveCount":
+                setRetrieveCount(value);
+                break;
+            case "resultsMergeStrategy":
+                setResultsMergeStrategy(value);
+                break;
+            case "useSemanticRanker":
+                setUseSemanticRanker(value);
+                break;
+            case "useSemanticCaptions":
+                setUseSemanticCaptions(value);
+                break;
+            case "useQueryRewriting":
+                setUseQueryRewriting(value);
+                break;
+            case "reasoningEffort":
+                setReasoningEffort(value);
+                break;
+            case "excludeCategory":
+                setExcludeCategory(value);
+                break;
+            case "includeCategory":
+                setIncludeCategory(value);
+                break;
+            case "useOidSecurityFilter":
+                setUseOidSecurityFilter(value);
+                break;
+            case "useGroupsSecurityFilter":
+                setUseGroupsSecurityFilter(value);
+                break;
+            case "llmInputs":
+                break;
+            case "sendTextSources":
+                setSendTextSources(value);
+                break;
+            case "sendImageSources":
+                setSendImageSources(value);
+                break;
+            case "searchTextEmbeddings":
+                setSearchTextEmbeddings(value);
+                break;
+            case "searchImageEmbeddings":
+                setSearchImageEmbeddings(value);
+                break;
+            case "retrievalMode":
+                setRetrievalMode(value);
+                break;
+            case "useAgenticRetrieval":
+                setUseAgenticRetrieval(value);
+        }
     };
 
     const onExampleClicked = (example: string) => {
@@ -201,39 +285,23 @@ export function Component(): JSX.Element {
         setUseGroupsSecurityFilter(!!checked);
     };
 
-    // IDs for form labels and their associated callouts
-    const promptTemplateId = useId("promptTemplate");
-    const promptTemplateFieldId = useId("promptTemplateField");
-    const temperatureId = useId("temperature");
-    const temperatureFieldId = useId("temperatureField");
-    const searchScoreId = useId("searchScore");
-    const searchScoreFieldId = useId("searchScoreField");
-    const rerankerScoreId = useId("rerankerScore");
-    const rerankerScoreFieldId = useId("rerankerScoreField");
-    const retrieveCountId = useId("retrieveCount");
-    const retrieveCountFieldId = useId("retrieveCountField");
-    const excludeCategoryId = useId("excludeCategory");
-    const excludeCategoryFieldId = useId("excludeCategoryField");
-    const semanticRankerId = useId("semanticRanker");
-    const semanticRankerFieldId = useId("semanticRankerField");
-    const semanticCaptionsId = useId("semanticCaptions");
-    const semanticCaptionsFieldId = useId("semanticCaptionsField");
-    const useOidSecurityFilterId = useId("useOidSecurityFilter");
-    const useOidSecurityFilterFieldId = useId("useOidSecurityFilterField");
-    const useGroupsSecurityFilterId = useId("useGroupsSecurityFilter");
-    const useGroupsSecurityFilterFieldId = useId("useGroupsSecurityFilterField");
+    const { t, i18n } = useTranslation();
 
     return (
         <div className={styles.askContainer}>
+            {/* Setting the page title using react-helmet-async */}
+            <Helmet>
+                <title>{t("pageTitle")}</title>
+            </Helmet>
             <div className={styles.askTopSection}>
                 <div className={styles.commandsContainer}>
-                    {showUserUpload && <UploadFile className={styles.commandButton} disabled={loggedIn} />}
+                    {showUserUpload && <UploadFile className={styles.commandButton} disabled={!loggedIn} />}
                     <SettingsButton className={styles.commandButton} onClick={() => setIsConfigPanelOpen(!isConfigPanelOpen)} />
                 </div>
-                <h1 className={styles.askTitle}>Ask your data</h1>
+                <h1 className={styles.askTitle}>{t("askTitle")}</h1>
                 <div className={styles.askQuestionInput}>
                     <QuestionInput
-                        placeholder="Example: Does my plan cover annual eye exams?"
+                        placeholder={t("multimodalExamples.placeholder")}
                         disabled={isLoading}
                         initQuestion={question}
                         onSend={question => makeApiRequest(question)}
@@ -242,19 +310,25 @@ export function Component(): JSX.Element {
                 </div>
             </div>
             <div className={styles.askBottomSection}>
-                {isLoading && <Spinner label="Generating answer" />}
-                {!lastQuestionRef.current && <ExampleList onExampleClicked={onExampleClicked} useGPT4V={useGPT4V} />}
+                {isLoading && <Spinner label={t("generatingAnswer")} />}
+                {!lastQuestionRef.current && (
+                    <div className={styles.askTopSection}>
+                        {showLanguagePicker && <LanguagePicker onLanguageChange={newLang => i18n.changeLanguage(newLang)} />}
+                        <ExampleList onExampleClicked={onExampleClicked} useMultimodalAnswering={showMultimodalOptions} />
+                    </div>
+                )}
                 {!isLoading && answer && !error && (
                     <div className={styles.askAnswerContainer}>
                         <Answer
                             answer={answer}
+                            index={0}
+                            speechConfig={speechConfig}
                             isStreaming={false}
                             onCitationClicked={x => onShowCitation(x)}
                             onThoughtProcessClicked={() => onToggleTab(AnalysisPanelTabs.ThoughtProcessTab)}
                             onSupportingContentClicked={() => onToggleTab(AnalysisPanelTabs.SupportingContentTab)}
                             showSpeechOutputAzure={showSpeechOutputAzure}
                             showSpeechOutputBrowser={showSpeechOutputBrowser}
-                            speechUrl={speechUrl}
                         />
                     </div>
                 )}
@@ -276,201 +350,49 @@ export function Component(): JSX.Element {
             </div>
 
             <Panel
-                headerText="Configure answer generation"
+                headerText={t("labels.headerText")}
                 isOpen={isConfigPanelOpen}
                 isBlocking={false}
                 onDismiss={() => setIsConfigPanelOpen(false)}
-                closeButtonAriaLabel="Close"
-                onRenderFooterContent={() => <DefaultButton onClick={() => setIsConfigPanelOpen(false)}>Close</DefaultButton>}
+                closeButtonAriaLabel={t("labels.closeButton")}
+                onRenderFooterContent={() => <DefaultButton onClick={() => setIsConfigPanelOpen(false)}>{t("labels.closeButton")}</DefaultButton>}
                 isFooterAtBottom={true}
             >
-                <TextField
-                    id={promptTemplateFieldId}
-                    className={styles.chatSettingsSeparator}
-                    defaultValue={promptTemplate}
-                    label="Override prompt template"
-                    multiline
-                    autoAdjustHeight
-                    onChange={onPromptTemplateChange}
-                    aria-labelledby={promptTemplateId}
-                    onRenderLabel={(props: ITextFieldProps | undefined) => (
-                        <HelpCallout labelId={promptTemplateId} fieldId={promptTemplateFieldId} helpText={toolTipText.promptTemplate} label={props?.label} />
-                    )}
+                <Settings
+                    promptTemplate={promptTemplate}
+                    promptTemplatePrefix={promptTemplatePrefix}
+                    promptTemplateSuffix={promptTemplateSuffix}
+                    temperature={temperature}
+                    retrieveCount={retrieveCount}
+                    resultsMergeStrategy={resultsMergeStrategy}
+                    seed={seed}
+                    minimumSearchScore={minimumSearchScore}
+                    minimumRerankerScore={minimumRerankerScore}
+                    useSemanticRanker={useSemanticRanker}
+                    useSemanticCaptions={useSemanticCaptions}
+                    useQueryRewriting={useQueryRewriting}
+                    reasoningEffort={reasoningEffort}
+                    excludeCategory={excludeCategory}
+                    includeCategory={includeCategory}
+                    retrievalMode={retrievalMode}
+                    sendTextSources={sendTextSources}
+                    sendImageSources={sendImageSources}
+                    searchTextEmbeddings={searchTextEmbeddings}
+                    searchImageEmbeddings={searchImageEmbeddings}
+                    showSemanticRankerOption={showSemanticRankerOption}
+                    showQueryRewritingOption={showQueryRewritingOption}
+                    showReasoningEffortOption={showReasoningEffortOption}
+                    showMultimodalOptions={showMultimodalOptions}
+                    showVectorOption={showVectorOption}
+                    useOidSecurityFilter={useOidSecurityFilter}
+                    useGroupsSecurityFilter={useGroupsSecurityFilter}
+                    useLogin={!!useLogin}
+                    loggedIn={loggedIn}
+                    requireAccessControl={requireAccessControl}
+                    showAgenticRetrievalOption={showAgenticRetrievalOption}
+                    useAgenticRetrieval={useAgenticRetrieval}
+                    onChange={handleSettingsChange}
                 />
-
-                <TextField
-                    id={temperatureFieldId}
-                    className={styles.chatSettingsSeparator}
-                    label="Temperature"
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    defaultValue={temperature.toString()}
-                    onChange={onTemperatureChange}
-                    aria-labelledby={temperatureId}
-                    onRenderLabel={(props: ITextFieldProps | undefined) => (
-                        <HelpCallout labelId={temperatureId} fieldId={temperatureFieldId} helpText={toolTipText.temperature} label={props?.label} />
-                    )}
-                />
-
-                <TextField
-                    id={searchScoreFieldId}
-                    className={styles.chatSettingsSeparator}
-                    label="Minimum search score"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    defaultValue={minimumSearchScore.toString()}
-                    onChange={onMinimumSearchScoreChange}
-                    aria-labelledby={searchScoreId}
-                    onRenderLabel={(props: ITextFieldProps | undefined) => (
-                        <HelpCallout labelId={searchScoreId} fieldId={searchScoreFieldId} helpText={toolTipText.searchScore} label={props?.label} />
-                    )}
-                />
-
-                {showSemanticRankerOption && (
-                    <TextField
-                        id={rerankerScoreFieldId}
-                        className={styles.chatSettingsSeparator}
-                        label="Minimum reranker score"
-                        type="number"
-                        min={1}
-                        max={4}
-                        step={0.1}
-                        defaultValue={minimumRerankerScore.toString()}
-                        onChange={onMinimumRerankerScoreChange}
-                        aria-labelledby={rerankerScoreId}
-                        onRenderLabel={(props: ITextFieldProps | undefined) => (
-                            <HelpCallout labelId={rerankerScoreId} fieldId={rerankerScoreFieldId} helpText={toolTipText.rerankerScore} label={props?.label} />
-                        )}
-                    />
-                )}
-
-                <TextField
-                    id={retrieveCountFieldId}
-                    className={styles.chatSettingsSeparator}
-                    label="Retrieve this many search results:"
-                    type="number"
-                    min={1}
-                    max={50}
-                    defaultValue={retrieveCount.toString()}
-                    onChange={onRetrieveCountChange}
-                    aria-labelledby={retrieveCountId}
-                    onRenderLabel={(props: ITextFieldProps | undefined) => (
-                        <HelpCallout labelId={retrieveCountId} fieldId={retrieveCountFieldId} helpText={toolTipText.retrieveNumber} label={props?.label} />
-                    )}
-                />
-
-                <TextField
-                    id={excludeCategoryFieldId}
-                    className={styles.chatSettingsSeparator}
-                    label="Exclude category"
-                    defaultValue={excludeCategory}
-                    onChange={onExcludeCategoryChanged}
-                    aria-labelledby={excludeCategoryId}
-                    onRenderLabel={(props: ITextFieldProps | undefined) => (
-                        <HelpCallout labelId={excludeCategoryId} fieldId={excludeCategoryFieldId} helpText={toolTipText.excludeCategory} label={props?.label} />
-                    )}
-                />
-
-                {showSemanticRankerOption && (
-                    <>
-                        <Checkbox
-                            id={semanticRankerFieldId}
-                            className={styles.chatSettingsSeparator}
-                            checked={useSemanticRanker}
-                            label="Use semantic ranker for retrieval"
-                            onChange={onUseSemanticRankerChange}
-                            aria-labelledby={semanticRankerId}
-                            onRenderLabel={(props: ICheckboxProps | undefined) => (
-                                <HelpCallout
-                                    labelId={semanticRankerId}
-                                    fieldId={semanticRankerFieldId}
-                                    helpText={toolTipText.useSemanticReranker}
-                                    label={props?.label}
-                                />
-                            )}
-                        />
-
-                        <Checkbox
-                            id={semanticCaptionsFieldId}
-                            className={styles.chatSettingsSeparator}
-                            checked={useSemanticCaptions}
-                            label="Use semantic captions"
-                            onChange={onUseSemanticCaptionsChange}
-                            disabled={!useSemanticRanker}
-                            aria-labelledby={semanticCaptionsId}
-                            onRenderLabel={(props: ICheckboxProps | undefined) => (
-                                <HelpCallout
-                                    labelId={semanticCaptionsId}
-                                    fieldId={semanticCaptionsFieldId}
-                                    helpText={toolTipText.useSemanticCaptions}
-                                    label={props?.label}
-                                />
-                            )}
-                        />
-                    </>
-                )}
-
-                {showGPT4VOptions && (
-                    <GPT4VSettings
-                        gpt4vInputs={gpt4vInput}
-                        isUseGPT4V={useGPT4V}
-                        updateUseGPT4V={useGPT4V => {
-                            setUseGPT4V(useGPT4V);
-                        }}
-                        updateGPT4VInputs={inputs => setGPT4VInput(inputs)}
-                    />
-                )}
-
-                {showVectorOption && (
-                    <VectorSettings
-                        defaultRetrievalMode={retrievalMode}
-                        showImageOptions={useGPT4V && showGPT4VOptions}
-                        updateVectorFields={(options: VectorFieldOptions[]) => setVectorFieldList(options)}
-                        updateRetrievalMode={(retrievalMode: RetrievalMode) => setRetrievalMode(retrievalMode)}
-                    />
-                )}
-
-                {useLogin && (
-                    <>
-                        <Checkbox
-                            id={useOidSecurityFilterFieldId}
-                            className={styles.chatSettingsSeparator}
-                            checked={useOidSecurityFilter || requireAccessControl}
-                            label="Use oid security filter"
-                            disabled={!loggedIn || requireAccessControl}
-                            onChange={onUseOidSecurityFilterChange}
-                            aria-labelledby={useOidSecurityFilterId}
-                            onRenderLabel={(props: ICheckboxProps | undefined) => (
-                                <HelpCallout
-                                    labelId={useOidSecurityFilterId}
-                                    fieldId={useOidSecurityFilterFieldId}
-                                    helpText={toolTipText.useOidSecurityFilter}
-                                    label={props?.label}
-                                />
-                            )}
-                        />
-                        <Checkbox
-                            id={useGroupsSecurityFilterFieldId}
-                            className={styles.chatSettingsSeparator}
-                            checked={useGroupsSecurityFilter || requireAccessControl}
-                            label="Use groups security filter"
-                            disabled={!loggedIn || requireAccessControl}
-                            onChange={onUseGroupsSecurityFilterChange}
-                            aria-labelledby={useGroupsSecurityFilterId}
-                            onRenderLabel={(props: ICheckboxProps | undefined) => (
-                                <HelpCallout
-                                    labelId={useGroupsSecurityFilterId}
-                                    fieldId={useGroupsSecurityFilterFieldId}
-                                    helpText={toolTipText.useGroupsSecurityFilter}
-                                    label={props?.label}
-                                />
-                            )}
-                        />
-                    </>
-                )}
                 {useLogin && <TokenClaimsDisplay />}
             </Panel>
         </div>

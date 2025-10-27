@@ -20,20 +20,26 @@
     "openAiResourceGroupName": {
       "value": "${AZURE_OPENAI_RESOURCE_GROUP}"
     },
+    "openAiLocation": {
+      "value": "${AZURE_OPENAI_LOCATION}"
+    },
     "openAiSkuName": {
       "value": "S0"
     },
-    "computerVisionServiceName": {
-      "value": "${AZURE_COMPUTER_VISION_SERVICE}"
+    "visionServiceName": {
+      "value": "${AZURE_VISION_SERVICE}"
     },
-    "computerVisionResourceGroupName": {
-      "value": "${AZURE_COMPUTER_VISION_RESOURCE_GROUP}"
+    "visionResourceGroupName": {
+      "value": "${AZURE_VISION_RESOURCE_GROUP}"
     },
-    "computerVisionResourceGroupLocation": {
-      "value": "${AZURE_COMPUTER_VISION_LOCATION=eastus}"
+    "visionResourceGroupLocation": {
+      "value": "${AZURE_VISION_LOCATION=eastus}"
     },
-    "computerVisionSkuName": {
-      "value": "${AZURE_COMPUTER_VISION_SKU=S1}"
+    "contentUnderstandingServiceName": {
+      "value": "${AZURE_CONTENT_UNDERSTANDING_SERVICE}"
+    },
+    "contentUnderstandingResourceGroupName": {
+      "value": "${AZURE_CONTENT_UNDERSTANDING_RESOURCE_GROUP}"
     },
     "documentIntelligenceServiceName": {
       "value": "${AZURE_DOCUMENTINTELLIGENCE_SERVICE}"
@@ -60,7 +66,7 @@
       "value": "${AZURE_SEARCH_SERVICE_LOCATION}"
     },
     "searchServiceSkuName": {
-      "value": "${AZURE_SEARCH_SERVICE_SKU=standard}"
+      "value": "${AZURE_SEARCH_SERVICE_SKU=basic}"
     },
     "searchQueryLanguage": {
       "value": "${AZURE_SEARCH_QUERY_LANGUAGE=en-us}"
@@ -70,6 +76,15 @@
     },
     "searchServiceSemanticRankerLevel": {
       "value": "${AZURE_SEARCH_SEMANTIC_RANKER=free}"
+    },
+    "searchServiceQueryRewriting": {
+      "value": "${AZURE_SEARCH_QUERY_REWRITING=false}"
+    },
+    "searchFieldNameEmbedding": {
+      "value": "${AZURE_SEARCH_FIELD_NAME_EMBEDDING=embedding3}"
+    },
+    "defaultReasoningEffort": {
+      "value": "${AZURE_OPENAI_REASONING_EFFORT=medium}"
     },
     "storageAccountName": {
       "value": "${AZURE_STORAGE_ACCOUNT}"
@@ -89,44 +104,83 @@
     "backendServiceName": {
       "value": "${AZURE_APP_SERVICE}"
     },
-    "chatGptModelName":{
+    "chatGptModelName": {
       "value": "${AZURE_OPENAI_CHATGPT_MODEL}"
     },
     "chatGptDeploymentName": {
       "value": "${AZURE_OPENAI_CHATGPT_DEPLOYMENT}"
     },
-    "chatGptDeploymentVersion":{
+    "chatGptDeploymentVersion": {
       "value": "${AZURE_OPENAI_CHATGPT_DEPLOYMENT_VERSION}"
     },
-    "chatGptDeploymentCapacity":{
+    "chatGptDeploymentSkuName": {
+      "value": "${AZURE_OPENAI_CHATGPT_DEPLOYMENT_SKU}"
+    },
+    "chatGptDeploymentCapacity": {
       "value": "${AZURE_OPENAI_CHATGPT_DEPLOYMENT_CAPACITY}"
     },
-    "embeddingModelName":{
+    "embeddingModelName": {
       "value": "${AZURE_OPENAI_EMB_MODEL_NAME}"
     },
     "embeddingDeploymentName": {
       "value": "${AZURE_OPENAI_EMB_DEPLOYMENT}"
     },
-    "embeddingDeploymentVersion":{
+    "embeddingDeploymentVersion": {
       "value": "${AZURE_OPENAI_EMB_DEPLOYMENT_VERSION}"
     },
-    "embeddingDeploymentCapacity":{
+    "embeddingDeploymentSkuName": {
+      "value": "${AZURE_OPENAI_EMB_DEPLOYMENT_SKU}"
+    },
+    "embeddingDeploymentCapacity": {
       "value": "${AZURE_OPENAI_EMB_DEPLOYMENT_CAPACITY}"
     },
     "embeddingDimensions": {
       "value": "${AZURE_OPENAI_EMB_DIMENSIONS}"
     },
+    "evalModelName": {
+      "value": "${AZURE_OPENAI_EVAL_MODEL}"
+    },
+    "evalModelVersion": {
+      "value": "${AZURE_OPENAI_EVAL_MODEL_VERSION}"
+    },
+    "evalDeploymentName": {
+      "value": "${AZURE_OPENAI_EVAL_DEPLOYMENT}"
+    },
+    "evalDeploymentSkuName": {
+      "value": "${AZURE_OPENAI_EVAL_DEPLOYMENT_SKU}"
+    },
+    "evalDeploymentCapacity": {
+      "value": "${AZURE_OPENAI_EVAL_DEPLOYMENT_CAPACITY}"
+    },
+    "searchAgentModelName": {
+      "value": "${AZURE_OPENAI_SEARCHAGENT_MODEL}"
+    },
+    "searchAgentModelVersion": {
+      "value": "${AZURE_OPENAI_SEARCHAGENT_MODEL_VERSION}"
+    },
+    "searchAgentDeploymentName": {
+      "value": "${AZURE_OPENAI_SEARCHAGENT_DEPLOYMENT}"
+    },
+    "searchAgentDeploymentSkuName": {
+      "value": "${AZURE_OPENAI_SEARCHAGENT_DEPLOYMENT_SKU}"
+    },
+    "searchAgentDeploymentCapacity": {
+      "value": "${AZURE_OPENAI_SEARCHAGENT_DEPLOYMENT_CAPACITY}"
+    },
     "openAiHost": {
       "value": "${OPENAI_HOST=azure}"
     },
-    "azureOpenAiCustomUrl":{
+    "azureOpenAiCustomUrl": {
       "value": "${AZURE_OPENAI_CUSTOM_URL}"
     },
-    "azureOpenAiApiVersion":{
+    "azureOpenAiApiVersion": {
       "value": "${AZURE_OPENAI_API_VERSION}"
     },
-    "azureOpenAiApiKey":{
-      "value": "${AZURE_OPENAI_API_KEY}"
+    "azureOpenAiApiKey": {
+      "value": "${AZURE_OPENAI_API_KEY_OVERRIDE}"
+    },
+    "azureOpenAiDisableKeys": {
+      "value": "${AZURE_OPENAI_DISABLE_KEYS=true}"
     },
     "openAiApiKey": {
       "value": "${OPENAI_API_KEY}"
@@ -149,8 +203,14 @@
     "useVectors": {
       "value": "${USE_VECTORS=true}"
     },
-    "useGPT4V": {
-      "value": "${USE_GPT4V=false}"
+    "useMultimodal": {
+      "value": "${USE_MULTIMODAL=false}"
+    },
+    "useEval": {
+      "value": "${USE_EVAL=false}"
+    },
+    "enableLanguagePicker": {
+      "value": "${ENABLE_LANGUAGE_PICKER=false}"
     },
     "useSpeechInputBrowser": {
       "value": "${USE_SPEECH_INPUT_BROWSER=false}"
@@ -173,20 +233,44 @@
     "speechServiceLocation": {
       "value": "${AZURE_SPEECH_SERVICE_LOCATION}"
     },
+    "useChatHistoryBrowser": {
+      "value": "${USE_CHAT_HISTORY_BROWSER=false}"
+    },
+    "useChatHistoryCosmos": {
+      "value": "${USE_CHAT_HISTORY_COSMOS=false}"
+    },
+    "cosmosDbSkuName": {
+      "value": "${AZURE_COSMOSDB_SKU=serverless}"
+    },
+    "cosmodDbResourceGroupName": {
+      "value": "${AZURE_COSMOSDB_RESOURCE_GROUP}"
+    },
+    "cosmosDbLocation": {
+      "value": "${AZURE_COSMOSDB_LOCATION}"
+    },
+    "cosmosDbAccountName": {
+      "value": "${AZURE_COSMOSDB_ACCOUNT}"
+    },
+    "cosmosDbThroughput": {
+      "value": "${AZURE_COSMOSDB_THROUGHPUT}"
+    },
+    "speechServiceVoice": {
+      "value": "${AZURE_SPEECH_SERVICE_VOICE}"
+    },
     "useAuthentication": {
       "value": "${AZURE_USE_AUTHENTICATION=false}"
     },
     "enforceAccessControl": {
       "value": "${AZURE_ENFORCE_ACCESS_CONTROL=false}"
     },
+    "disableAppServicesAuthentication": {
+      "value": "${AZURE_DISABLE_APP_SERVICES_AUTHENTICATION=false}"
+    },
     "enableGlobalDocuments": {
       "value": "${AZURE_ENABLE_GLOBAL_DOCUMENT_ACCESS=false}"
     },
     "enableUnauthenticatedAccess": {
       "value": "${AZURE_ENABLE_UNAUTHENTICATED_ACCESS=false}"
-    },
-    "tenantId": {
-      "value": "${AZURE_TENANT_ID}"
     },
     "authTenantId": {
       "value": "${AZURE_AUTH_TENANT_ID}"
@@ -212,26 +296,11 @@
     "usePrivateEndpoint": {
       "value": "${AZURE_USE_PRIVATE_ENDPOINT=false}"
     },
+    "useVpnGateway": {
+      "value": "${AZURE_USE_VPN_GATEWAY=false}"
+    },
     "bypass": {
       "value": "${AZURE_NETWORK_BYPASS=AzureServices}"
-    },
-    "provisionVm": {
-      "value": "${AZURE_PROVISION_VM=false}"
-    },
-    "vmUserName": {
-      "value": "${AZURE_VM_USERNAME}"
-    },
-    "vmPassword": {
-      "value": "${AZURE_VM_PASSWORD}"
-    },
-    "vmOsVersion": {
-      "value": "${AZURE_VM_OS_VERSION=2022-datacenter-azure-edition}"
-    },
-    "vmOsPublisher": {
-      "value": "${AZURE_VM_OS_PUBLISHER=MicrosoftWindowsServer}"
-    },
-    "vmOsOffer": {
-      "value": "${AZURE_VM_OS_OFFER=WindowsServer}"
     },
     "useIntegratedVectorization": {
       "value": "${USE_FEATURE_INT_VECTORIZATION}"
@@ -250,6 +319,36 @@
     },
     "runningOnAdo": {
       "value": "${TF_BUILD}"
+    },
+    "deploymentTarget": {
+      "value": "${DEPLOYMENT_TARGET=containerapps}"
+    },
+    "webAppExists": {
+      "value": "${SERVICE_WEB_RESOURCE_EXISTS=false}"
+    },
+    "azureContainerAppsWorkloadProfile": {
+      "value": "${AZURE_CONTAINER_APPS_WORKLOAD_PROFILE=Consumption}"
+    },
+    "useMediaDescriberAzureCU": {
+      "value": "${USE_MEDIA_DESCRIBER_AZURE_CU=false}"
+    },
+    "useAiProject": {
+      "value": "${USE_AI_PROJECT=false}"
+    },
+    "useAgenticRetrieval": {
+      "value": "${USE_AGENTIC_RETRIEVAL=false}"
+    },
+    "ragSearchTextEmbeddings": {
+      "value": "${RAG_SEARCH_TEXT_EMBEDDINGS=true}"
+    },
+    "ragSearchImageEmbeddings": {
+      "value": "${RAG_SEARCH_IMAGE_EMBEDDINGS=true}"
+    },
+    "ragSendTextSources": {
+      "value": "${RAG_SEND_TEXT_SOURCES=true}"
+    },
+    "ragSendImageSources": {
+      "value": "${RAG_SEND_IMAGE_SOURCES=true}"
     }
   }
 }

@@ -13,7 +13,7 @@ on:
 # To configure required secrets for connecting to Azure, simply run `azd pipeline config`
 
 # Set up permissions for deploying with secretless Azure federated credentials
-# https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-portal%2Clinux#set-up-azure-login-with-openid-connect-authentication
+# https://learn.microsoft.com/azure/developer/github/connect-from-azure?tabs=azure-portal%2Clinux#set-up-azure-login-with-openid-connect-authentication
 permissions:
   id-token: write
   contents: read
@@ -30,15 +30,17 @@ jobs:
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
       # project specific
       AZURE_OPENAI_SERVICE: ${{ vars.AZURE_OPENAI_SERVICE }}
+      AZURE_OPENAI_LOCATION: ${{ vars.AZURE_OPENAI_LOCATION }}
       AZURE_OPENAI_API_VERSION: ${{ vars.AZURE_OPENAI_API_VERSION }}
       AZURE_OPENAI_RESOURCE_GROUP: ${{ vars.AZURE_OPENAI_RESOURCE_GROUP }}
-      AZURE_COMPUTER_VISION_SERVICE: ${{ vars.AZURE_COMPUTER_VISION_SERVICE }}
-      AZURE_COMPUTER_VISION_RESOURCE_GROUP: ${{ vars.AZURE_COMPUTER_VISION_RESOURCE_GROUP }}
-      AZURE_COMPUTER_VISION_LOCATION: ${{ vars.AZURE_COMPUTER_VISION_LOCATION }}
-      AZURE_COMPUTER_VISION_SKU: ${{ vars.AZURE_COMPUTER_VISION_SKU }}
-      AZURE_FORMRECOGNIZER_SERVICE: ${{ vars.AZURE_FORMRECOGNIZER_SERVICE }}
-      AZURE_FORMRECOGNIZER_RESOURCE_GROUP: ${{ vars.AZURE_FORMRECOGNIZER_RESOURCE_GROUP }}
-      AZURE_FORMRECOGNIZER_SKU: ${{ vars.AZURE_FORMRECOGNIZER_SKU }}
+      AZURE_DOCUMENTINTELLIGENCE_SERVICE: ${{ vars.AZURE_DOCUMENTINTELLIGENCE_SERVICE }}
+      AZURE_DOCUMENTINTELLIGENCE_RESOURCE_GROUP: ${{ vars.AZURE_DOCUMENTINTELLIGENCE_RESOURCE_GROUP }}
+      AZURE_DOCUMENTINTELLIGENCE_SKU: ${{ vars.AZURE_DOCUMENTINTELLIGENCE_SKU }}
+      AZURE_DOCUMENTINTELLIGENCE_LOCATION: ${{ vars.AZURE_DOCUMENTINTELLIGENCE_LOCATION }}
+      AZURE_VISION_SERVICE: ${{ vars.AZURE_VISION_SERVICE }}
+      AZURE_VISION_RESOURCE_GROUP: ${{ vars.AZURE_VISION_RESOURCE_GROUP }}
+      AZURE_VISION_LOCATION: ${{ vars.AZURE_VISION_LOCATION }}
+      AZURE_VISION_SKU: ${{ vars.AZURE_VISION_SKU }}
       AZURE_SEARCH_INDEX: ${{ vars.AZURE_SEARCH_INDEX }}
       AZURE_SEARCH_SERVICE: ${{ vars.AZURE_SEARCH_SERVICE }}
       AZURE_SEARCH_SERVICE_RESOURCE_GROUP: ${{ vars.AZURE_SEARCH_SERVICE_RESOURCE_GROUP }}
@@ -47,6 +49,8 @@ jobs:
       AZURE_SEARCH_QUERY_LANGUAGE: ${{ vars.AZURE_SEARCH_QUERY_LANGUAGE }}
       AZURE_SEARCH_QUERY_SPELLER: ${{ vars.AZURE_SEARCH_QUERY_SPELLER }}
       AZURE_SEARCH_SEMANTIC_RANKER: ${{ vars.AZURE_SEARCH_SEMANTIC_RANKER }}
+      AZURE_SEARCH_QUERY_REWRITING: ${{ vars.AZURE_SEARCH_QUERY_REWRITING }}
+      AZURE_SEARCH_FIELD_NAME_EMBEDDING: ${{ vars.AZURE_SEARCH_FIELD_NAME_EMBEDDING }}
       AZURE_STORAGE_ACCOUNT: ${{ vars.AZURE_STORAGE_ACCOUNT }}
       AZURE_STORAGE_RESOURCE_GROUP: ${{ vars.AZURE_STORAGE_RESOURCE_GROUP }}
       AZURE_STORAGE_SKU: ${{ vars.AZURE_STORAGE_SKU }}
@@ -57,11 +61,19 @@ jobs:
       AZURE_OPENAI_CHATGPT_DEPLOYMENT: ${{ vars.AZURE_OPENAI_CHATGPT_DEPLOYMENT }}
       AZURE_OPENAI_CHATGPT_DEPLOYMENT_CAPACITY: ${{ vars.AZURE_OPENAI_CHATGPT_DEPLOYMENT_CAPACITY }}
       AZURE_OPENAI_CHATGPT_DEPLOYMENT_VERSION: ${{ vars.AZURE_OPENAI_CHATGPT_DEPLOYMENT_VERSION }}
+      AZURE_OPENAI_REASONING_EFFORT: ${{ vars.AZURE_OPENAI_REASONING_EFFORT }}
       AZURE_OPENAI_EMB_MODEL_NAME: ${{ vars.AZURE_OPENAI_EMB_MODEL_NAME }}
       AZURE_OPENAI_EMB_DEPLOYMENT: ${{ vars.AZURE_OPENAI_EMB_DEPLOYMENT }}
       AZURE_OPENAI_EMB_DEPLOYMENT_CAPACITY: ${{ vars.AZURE_OPENAI_EMB_DEPLOYMENT_CAPACITY }}
       AZURE_OPENAI_EMB_DEPLOYMENT_VERSION: ${{ vars.AZURE_OPENAI_EMB_DEPLOYMENT_VERSION }}
       AZURE_OPENAI_EMB_DIMENSIONS: ${{ vars.AZURE_OPENAI_EMB_DIMENSIONS }}
+      USE_EVAL: ${{ vars.USE_EVAL }}
+      AZURE_OPENAI_EVAL_MODEL: ${{ vars.AZURE_OPENAI_EVAL_MODEL }}
+      AZURE_OPENAI_EVAL_MODEL_VERSION: ${{ vars.AZURE_OPENAI_EVAL_MODEL_VERSION }}
+      AZURE_OPENAI_EVAL_DEPLOYMENT: ${{ vars.AZURE_OPENAI_EVAL_DEPLOYMENT }}
+      AZURE_OPENAI_EVAL_DEPLOYMENT_SKU: ${{ vars.AZURE_OPENAI_EVAL_DEPLOYMENT_SKU }}
+      AZURE_OPENAI_EVAL_DEPLOYMENT_CAPACITY: ${{ vars.AZURE_OPENAI_EVAL_DEPLOYMENT_CAPACITY }}
+      AZURE_OPENAI_DISABLE_KEYS: ${{ vars.AZURE_OPENAI_DISABLE_KEYS }}
       OPENAI_HOST: ${{ vars.OPENAI_HOST }}
       OPENAI_API_KEY: ${{ vars.OPENAI_API_KEY }}
       OPENAI_ORGANIZATION: ${{ vars.OPENAI_ORGANIZATION }}
@@ -70,9 +82,10 @@ jobs:
       AZURE_APPLICATION_INSIGHTS_DASHBOARD: ${{ vars.AZURE_APPLICATION_INSIGHTS_DASHBOARD }}
       AZURE_LOG_ANALYTICS: ${{ vars.AZURE_LOG_ANALYTICS }}
       USE_VECTORS: ${{ vars.USE_VECTORS }}
-      USE_GPT4V: ${{ vars.USE_GPT4V }}
+      USE_MULTIMODAL: ${{ vars.USE_MULTIMODAL }}
       AZURE_VISION_ENDPOINT: ${{ vars.AZURE_VISION_ENDPOINT }}
       VISION_SECRET_NAME: ${{ vars.VISION_SECRET_NAME }}
+      ENABLE_LANGUAGE_PICKER: ${{ vars.ENABLE_LANGUAGE_PICKER }}
       USE_SPEECH_INPUT_BROWSER: ${{ vars.USE_SPEECH_INPUT_BROWSER }}
       USE_SPEECH_OUTPUT_BROWSER: ${{ vars.USE_SPEECH_OUTPUT_BROWSER }}
       USE_SPEECH_OUTPUT_AZURE: ${{ vars.USE_SPEECH_OUTPUT_AZURE }}
@@ -80,6 +93,7 @@ jobs:
       AZURE_SPEECH_SERVICE_RESOURCE_GROUP: ${{ vars.AZURE_SPEECH_RESOURCE_GROUP }}
       AZURE_SPEECH_SERVICE_LOCATION: ${{ vars.AZURE_SPEECH_SERVICE_LOCATION }}
       AZURE_SPEECH_SERVICE_SKU: ${{ vars.AZURE_SPEECH_SERVICE_SKU }}
+      AZURE_SPEECH_SERVICE_VOICE: ${{ vars.AZURE_SPEECH_SERVICE_VOICE }}
       AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
       AZURE_USE_AUTHENTICATION: ${{ vars.AZURE_USE_AUTHENTICATION }}
       AZURE_ENFORCE_ACCESS_CONTROL: ${{ vars.AZURE_ENFORCE_ACCESS_CONTROL }}
@@ -92,21 +106,28 @@ jobs:
       AZURE_ADLS_GEN2_STORAGE_ACCOUNT: ${{ vars.AZURE_ADLS_GEN2_STORAGE_ACCOUNT }}
       AZURE_ADLS_GEN2_FILESYSTEM_PATH: ${{ vars.AZURE_ADLS_GEN2_FILESYSTEM_PATH }}
       AZURE_ADLS_GEN2_FILESYSTEM: ${{ vars.AZURE_ADLS_GEN2_FILESYSTEM }}
-
+      DEPLOYMENT_TARGET: ${{ vars.DEPLOYMENT_TARGET }}
+      AZURE_CONTAINER_APPS_WORKLOAD_PROFILE: ${{ vars.AZURE_CONTAINER_APPS_WORKLOAD_PROFILE }}
+      USE_CHAT_HISTORY_BROWSER: ${{ vars.USE_CHAT_HISTORY_BROWSER }}
+      USE_MEDIA_DESCRIBER_AZURE_CU: ${{ vars.USE_MEDIA_DESCRIBER_AZURE_CU }}
+      USE_AI_PROJECT: ${{ vars.USE_AI_PROJECT }}
+      RAG_SEARCH_TEXT_EMBEDDINGS: ${{ vars.RAG_SEARCH_TEXT_EMBEDDINGS }}
+      RAG_SEARCH_IMAGE_EMBEDDINGS: ${{ vars.RAG_SEARCH_IMAGE_EMBEDDINGS }}
+      RAG_SEND_TEXT_SOURCES: ${{ vars.RAG_SEND_TEXT_SOURCES }}
+      RAG_SEND_IMAGE_SOURCES: ${{ vars.RAG_SEND_IMAGE_SOURCES }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install azd
-        uses: Azure/setup-azd@v1.0.0
+        uses: Azure/setup-azd@v2.2.0
 
       - name: Install Nodejs
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Log in with Azure (Federated Credentials)
-        if: ${{ env.AZURE_CLIENT_ID != '' }}
         run: |
           azd auth login `
             --client-id "$Env:AZURE_CLIENT_ID" `
@@ -114,25 +135,8 @@ jobs:
             --tenant-id "$Env:AZURE_TENANT_ID"
         shell: pwsh
 
-      - name: Log in with Azure (Client Credentials)
-        if: ${{ env.AZURE_CREDENTIALS != '' }}
-        run: |
-          $info = $Env:AZURE_CREDENTIALS | ConvertFrom-Json -AsHashtable;
-          Write-Host "::add-mask::$($info.clientSecret)"
-
-          azd auth login `
-            --client-id "$($info.clientId)" `
-            --client-secret "$($info.clientSecret)" `
-            --tenant-id "$($info.tenantId)"
-        shell: pwsh
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # Creating azd environment is a temp workaround for
-      # https://github.com/Azure/azure-dev/issues/3920
-      # To be removed once the issue is fixed
-      - name: Create azd env
-        run: azd env new $AZURE_ENV_NAME --no-prompt
+      - name: Provision Infrastructure
+        run: azd provision --no-prompt
         env:
           AZD_INITIAL_ENVIRONMENT_CONFIG: ${{ secrets.AZD_INITIAL_ENVIRONMENT_CONFIG }}
 

@@ -48,11 +48,7 @@ param authenticationIssuerUri string = ''
 @allowed([ 'Enabled', 'Disabled' ])
 param publicNetworkAccess string = 'Enabled'
 param enableUnauthenticatedAccess bool = false
-
-var msftAllowedOrigins = [ 'https://portal.azure.com', 'https://ms.portal.azure.com' ]
-var loginEndpoint = environment().authentication.loginEndpoint
-var loginEndpointFixed = lastIndexOf(loginEndpoint, '/') == length(loginEndpoint) - 1 ? substring(loginEndpoint, 0, length(loginEndpoint) - 1) : loginEndpoint
-var allMsftAllowedOrigins = !(empty(clientAppId)) ? union(msftAllowedOrigins, [ loginEndpointFixed ]) : msftAllowedOrigins
+param disableAppServicesAuthentication bool = false
 
 // .default must be the 1st scope for On-Behalf-Of-Flow combined consent to work properly
 // Please see https://learn.microsoft.com/entra/identity-platform/v2-oauth2-on-behalf-of-flow#default-and-combined-consent
@@ -71,7 +67,7 @@ var coreConfig = {
   functionAppScaleLimit: functionAppScaleLimit != -1 ? functionAppScaleLimit : null
   healthCheckPath: healthCheckPath
   cors: {
-    allowedOrigins: union(allMsftAllowedOrigins, allowedOrigins)
+    allowedOrigins: allowedOrigins
   }
 }
 
@@ -134,7 +130,7 @@ resource appService 'Microsoft.Web/sites@2022-03-01' = {
     }
   }
 
-  resource configAuth 'config' = if (!(empty(clientAppId))) {
+  resource configAuth 'config' = if (!(empty(clientAppId)) && !disableAppServicesAuthentication) {
     name: 'authsettingsV2'
     properties: {
       globalValidation: {

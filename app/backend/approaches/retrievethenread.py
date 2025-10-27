@@ -1,13 +1,20 @@
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
+from azure.search.documents.agent.aio import KnowledgeAgentRetrievalClient
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import VectorQuery
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam
-from openai_messages_token_helper import build_messages, get_token_limit
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
-from approaches.approach import Approach, ThoughtStep
+from approaches.approach import (
+    Approach,
+    ExtraInfo,
+    ThoughtStep,
+)
+from approaches.promptmanager import PromptManager
 from core.authentication import AuthenticationHelper
+from prepdocslib.blobmanager import AdlsBlobManager, BlobManager
+from prepdocslib.embeddings import ImageEmbeddings
 
 
 class RetrieveThenReadApproach(Approach):
@@ -17,31 +24,14 @@ class RetrieveThenReadApproach(Approach):
     (answer) with that prompt.
     """
 
-    system_chat_template = (
-        "You are an intelligent assistant helping Contoso Inc employees with their healthcare plan questions and employee handbook questions. "
-        + "Use 'you' to refer to the individual asking the questions even if they ask with 'I'. "
-        + "Answer the following question using only the data provided in the sources below. "
-        + "For tabular information return it as an html table. Do not return markdown format. "
-        + "Each source has a name followed by colon and the actual information, always include the source name for each fact you use in the response. "
-        + "If you cannot answer using the sources below, say you don't know. Use below example to answer"
-    )
-
-    # shots/sample conversation
-    question = """
-'What is the deductible for the employee plan for a visit to Overlake in Bellevue?'
-
-Sources:
-info1.txt: deductibles depend on whether you are in-network or out-of-network. In-network deductibles are $500 for employee and $1000 for family. Out-of-network deductibles are $1000 for employee and $2000 for family.
-info2.pdf: Overlake is in-network for the employee plan.
-info3.pdf: Overlake is the name of the area that includes a park and ride near Bellevue.
-info4.pdf: In-network institutions include Overlake, Swedish and others in the region
-"""
-    answer = "In-network deductibles are $500 for employee and $1000 for family [info1.txt] and Overlake is in-network for the employee plan [info2.pdf][info4.pdf]."
-
     def __init__(
         self,
         *,
         search_client: SearchClient,
+        search_index_name: str,
+        agent_model: Optional[str],
+        agent_deployment: Optional[str],
+        agent_client: KnowledgeAgentRetrievalClient,
         auth_helper: AuthenticationHelper,
         openai_client: AsyncOpenAI,
         chatgpt_model: str,
@@ -49,12 +39,23 @@ info4.pdf: In-network institutions include Overlake, Swedish and others in the r
         embedding_model: str,
         embedding_deployment: Optional[str],  # Not needed for non-Azure OpenAI or for retrieval_mode="text"
         embedding_dimensions: int,
+        embedding_field: str,
         sourcepage_field: str,
         content_field: str,
         query_language: str,
         query_speller: str,
+        prompt_manager: PromptManager,
+        reasoning_effort: Optional[str] = None,
+        multimodal_enabled: bool = False,
+        image_embeddings_client: Optional[ImageEmbeddings] = None,
+        global_blob_manager: Optional[BlobManager] = None,
+        user_blob_manager: Optional[AdlsBlobManager] = None,
     ):
         self.search_client = search_client
+        self.search_index_name = search_index_name
+        self.agent_model = agent_model
+        self.agent_deployment = agent_deployment
+        self.agent_client = agent_client
         self.chatgpt_deployment = chatgpt_deployment
         self.openai_client = openai_client
         self.auth_helper = auth_helper
@@ -63,11 +64,19 @@ info4.pdf: In-network institutions include Overlake, Swedish and others in the r
         self.embedding_dimensions = embedding_dimensions
         self.chatgpt_deployment = chatgpt_deployment
         self.embedding_deployment = embedding_deployment
+        self.embedding_field = embedding_field
         self.sourcepage_field = sourcepage_field
         self.content_field = content_field
         self.query_language = query_language
         self.query_speller = query_speller
-        self.chatgpt_token_limit = get_token_limit(chatgpt_model)
+        self.prompt_manager = prompt_manager
+        self.answer_prompt = self.prompt_manager.load_prompt("ask_answer_question.prompty")
+        self.reasoning_effort = reasoning_effort
+        self.include_token_usage = True
+        self.multimodal_enabled = multimodal_enabled
+        self.image_embeddings_client = image_embeddings_client
+        self.global_blob_manager = global_blob_manager
+        self.user_blob_manager = user_blob_manager
 
     async def run(
         self,
@@ -75,24 +84,92 @@ info4.pdf: In-network institutions include Overlake, Swedish and others in the r
         session_state: Any = None,
         context: dict[str, Any] = {},
     ) -> dict[str, Any]:
+        overrides = context.get("overrides", {})
+        auth_claims = context.get("auth_claims", {})
+        use_agentic_retrieval = True if overrides.get("use_agentic_retrieval") else False
         q = messages[-1]["content"]
         if not isinstance(q, str):
             raise ValueError("The most recent message content must be a string.")
-        overrides = context.get("overrides", {})
-        auth_claims = context.get("auth_claims", {})
+
+        if use_agentic_retrieval:
+            extra_info = await self.run_agentic_retrieval_approach(messages, overrides, auth_claims)
+        else:
+            extra_info = await self.run_search_approach(messages, overrides, auth_claims)
+
+        # Process results
+        messages = self.prompt_manager.render_prompt(
+            self.answer_prompt,
+            self.get_system_prompt_variables(overrides.get("prompt_template"))
+            | {
+                "user_query": q,
+                "text_sources": extra_info.data_points.text,
+                "image_sources": extra_info.data_points.images or [],
+                "citations": extra_info.data_points.citations,
+            },
+        )
+
+        chat_completion = cast(
+            ChatCompletion,
+            await self.create_chat_completion(
+                self.chatgpt_deployment,
+                self.chatgpt_model,
+                messages=messages,
+                overrides=overrides,
+                response_token_limit=self.get_response_token_limit(self.chatgpt_model, 1024),
+            ),
+        )
+        extra_info.thoughts.append(
+            self.format_thought_step_for_chatcompletion(
+                title="Prompt to generate answer",
+                messages=messages,
+                overrides=overrides,
+                model=self.chatgpt_model,
+                deployment=self.chatgpt_deployment,
+                usage=chat_completion.usage,
+            )
+        )
+        return {
+            "message": {
+                "content": chat_completion.choices[0].message.content,
+                "role": chat_completion.choices[0].message.role,
+            },
+            "context": {
+                "thoughts": extra_info.thoughts,
+                "data_points": {
+                    "text": extra_info.data_points.text or [],
+                    "images": extra_info.data_points.images or [],
+                    "citations": extra_info.data_points.citations or [],
+                },
+            },
+            "session_state": session_state,
+        }
+
+    async def run_search_approach(
+        self, messages: list[ChatCompletionMessageParam], overrides: dict[str, Any], auth_claims: dict[str, Any]
+    ) -> ExtraInfo:
         use_text_search = overrides.get("retrieval_mode") in ["text", "hybrid", None]
         use_vector_search = overrides.get("retrieval_mode") in ["vectors", "hybrid", None]
         use_semantic_ranker = True if overrides.get("semantic_ranker") else False
+        use_query_rewriting = True if overrides.get("query_rewriting") else False
         use_semantic_captions = True if overrides.get("semantic_captions") else False
         top = overrides.get("top", 3)
         minimum_search_score = overrides.get("minimum_search_score", 0.0)
         minimum_reranker_score = overrides.get("minimum_reranker_score", 0.0)
         filter = self.build_filter(overrides, auth_claims)
+        q = str(messages[-1]["content"])
+        send_text_sources = overrides.get("send_text_sources", True)
+        send_image_sources = overrides.get("send_image_sources", self.multimodal_enabled) and self.multimodal_enabled
+        search_text_embeddings = overrides.get("search_text_embeddings", True)
+        search_image_embeddings = (
+            overrides.get("search_image_embeddings", self.multimodal_enabled) and self.multimodal_enabled
+        )
 
-        # If retrieval mode includes vectors, compute an embedding for the query
         vectors: list[VectorQuery] = []
         if use_vector_search:
-            vectors.append(await self.compute_text_embedding(q))
+            if search_text_embeddings:
+                vectors.append(await self.compute_text_embedding(q))
+            if search_image_embeddings:
+                vectors.append(await self.compute_multimodal_embedding(q))
 
         results = await self.search(
             top,
@@ -105,69 +182,96 @@ info4.pdf: In-network institutions include Overlake, Swedish and others in the r
             use_semantic_captions,
             minimum_search_score,
             minimum_reranker_score,
+            use_query_rewriting,
         )
 
-        # Process results
-        sources_content = self.get_sources_content(results, use_semantic_captions, use_image_citation=False)
-
-        # Append user message
-        content = "\n".join(sources_content)
-        user_content = q + "\n" + f"Sources:\n {content}"
-
-        response_token_limit = 1024
-        updated_messages = build_messages(
-            model=self.chatgpt_model,
-            system_prompt=overrides.get("prompt_template", self.system_chat_template),
-            few_shots=[{"role": "user", "content": self.question}, {"role": "assistant", "content": self.answer}],
-            new_user_content=user_content,
-            max_tokens=self.chatgpt_token_limit - response_token_limit,
+        data_points = await self.get_sources_content(
+            results,
+            use_semantic_captions,
+            include_text_sources=send_text_sources,
+            download_image_sources=send_image_sources,
+            user_oid=auth_claims.get("oid"),
         )
 
-        chat_completion = (
-            await self.openai_client.chat.completions.create(
-                # Azure OpenAI takes the deployment name as the model name
-                model=self.chatgpt_deployment if self.chatgpt_deployment else self.chatgpt_model,
-                messages=updated_messages,
-                temperature=overrides.get("temperature", 0.3),
-                max_tokens=response_token_limit,
-                n=1,
-            )
-        ).model_dump()
-
-        data_points = {"text": sources_content}
-        extra_info = {
-            "data_points": data_points,
-            "thoughts": [
+        return ExtraInfo(
+            data_points,
+            thoughts=[
                 ThoughtStep(
                     "Search using user query",
                     q,
                     {
                         "use_semantic_captions": use_semantic_captions,
                         "use_semantic_ranker": use_semantic_ranker,
+                        "use_query_rewriting": use_query_rewriting,
                         "top": top,
                         "filter": filter,
                         "use_vector_search": use_vector_search,
                         "use_text_search": use_text_search,
+                        "search_text_embeddings": search_text_embeddings,
+                        "search_image_embeddings": search_image_embeddings,
                     },
                 ),
                 ThoughtStep(
                     "Search results",
                     [result.serialize_for_results() for result in results],
                 ),
+            ],
+        )
+
+    async def run_agentic_retrieval_approach(
+        self,
+        messages: list[ChatCompletionMessageParam],
+        overrides: dict[str, Any],
+        auth_claims: dict[str, Any],
+    ) -> ExtraInfo:
+        minimum_reranker_score = overrides.get("minimum_reranker_score", 0)
+        search_index_filter = self.build_filter(overrides, auth_claims)
+        top = overrides.get("top", 3)
+        results_merge_strategy = overrides.get("results_merge_strategy", "interleaved")
+        send_text_sources = overrides.get("send_text_sources", True)
+        send_image_sources = overrides.get("send_image_sources", self.multimodal_enabled) and self.multimodal_enabled
+
+        response, results = await self.run_agentic_retrieval(
+            messages,
+            self.agent_client,
+            search_index_name=self.search_index_name,
+            top=top,
+            filter_add_on=search_index_filter,
+            minimum_reranker_score=minimum_reranker_score,
+            results_merge_strategy=results_merge_strategy,
+        )
+
+        data_points = await self.get_sources_content(
+            results,
+            use_semantic_captions=False,
+            include_text_sources=send_text_sources,
+            download_image_sources=send_image_sources,
+            user_oid=auth_claims.get("oid"),
+        )
+
+        extra_info = ExtraInfo(
+            data_points,
+            thoughts=[
                 ThoughtStep(
-                    "Prompt to generate answer",
-                    [str(message) for message in updated_messages],
-                    (
-                        {"model": self.chatgpt_model, "deployment": self.chatgpt_deployment}
-                        if self.chatgpt_deployment
-                        else {"model": self.chatgpt_model}
-                    ),
+                    "Use agentic retrieval",
+                    messages,
+                    {
+                        "reranker_threshold": minimum_reranker_score,
+                        "results_merge_strategy": results_merge_strategy,
+                        "filter": search_index_filter,
+                    },
+                ),
+                ThoughtStep(
+                    f"Agentic retrieval results (top {top})",
+                    [result.serialize_for_results() for result in results],
+                    {
+                        "query_plan": (
+                            [activity.as_dict() for activity in response.activity] if response.activity else None
+                        ),
+                        "model": self.agent_model,
+                        "deployment": self.agent_deployment,
+                    },
                 ),
             ],
-        }
-
-        completion = {}
-        completion["message"] = chat_completion["choices"][0]["message"]
-        completion["context"] = extra_info
-        completion["session_state"] = session_state
-        return completion
+        )
+        return extra_info

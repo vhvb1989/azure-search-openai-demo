@@ -1,5 +1,5 @@
 
-# Deploying with existing Azure resources
+# RAG chat: Deploying with existing Azure resources
 
 If you already have existing Azure resources, or if you want to specify the exact name of new Azure Resource, you can do so by setting `azd` environment values.
 You should set these values before running `azd up`. Once you've set them, return to the [deployment steps](../README.md#deploying).
@@ -9,7 +9,7 @@ You should set these values before running `azd up`. Once you've set them, retur
 * [Azure AI Search resource](#azure-ai-search-resource)
 * [Azure App Service Plan and App Service resources](#azure-app-service-plan-and-app-service-resources)
 * [Azure Application Insights and related resources](#azure-application-insights-and-related-resources)
-* [Azure Computer Vision resources](#azure-computer-vision-resources)
+* [Azure AI Vision resources](#azure-ai-vision-resources)
 * [Azure Document Intelligence resource](#azure-document-intelligence-resource)
 * [Azure Speech resource](#azure-speech-resource)
 * [Other Azure resources](#other-azure-resources)
@@ -25,8 +25,16 @@ You should set these values before running `azd up`. Once you've set them, retur
 
 1. Run `azd env set AZURE_OPENAI_SERVICE {Name of existing OpenAI service}`
 1. Run `azd env set AZURE_OPENAI_RESOURCE_GROUP {Name of existing resource group that OpenAI service is provisioned to}`
-1. Run `azd env set AZURE_OPENAI_CHATGPT_DEPLOYMENT {Name of existing ChatGPT deployment}`. Only needed if your ChatGPT deployment is not the default 'chat'.
-1. Run `azd env set AZURE_OPENAI_EMB_DEPLOYMENT {Name of existing GPT embedding deployment}`. Only needed if your embeddings deployment is not the default 'embedding'.
+1. Run `azd env set AZURE_OPENAI_LOCATION {Location of existing OpenAI service}`
+1. Run `azd env set AZURE_OPENAI_CHATGPT_DEPLOYMENT {Name of existing chat deployment}`. Only needed if your chat deployment name is not the default 'gpt-4.1-mini'.
+1. Run `azd env set AZURE_OPENAI_CHATGPT_MODEL {Model name of existing chat deployment}`. Only needed if your chat model is not the default 'gpt-4.1-mini'.
+1. Run `azd env set AZURE_OPENAI_CHATGPT_DEPLOYMENT_VERSION {Version string for existing chat deployment}`. Only needed if your chat deployment model version is not the default '2024-07-18'. You definitely need to change this if you changed the model.
+1. Run `azd env set AZURE_OPENAI_CHATGPT_DEPLOYMENT_SKU {Name of SKU for existing chat deployment}`. Only needed if your chat deployment SKU is not the default 'Standard', like if it is 'GlobalStandard' instead.
+1. Run `azd env set AZURE_OPENAI_EMB_DEPLOYMENT {Name of existing embedding deployment}`. Only needed if your embeddings deployment is not the default 'embedding'.
+1. Run `azd env set AZURE_OPENAI_EMB_MODEL_NAME {Model name of existing embedding deployment}`. Only needed if your embeddings model is not the default 'text-embedding-3-large'.
+1. Run `azd env set AZURE_OPENAI_EMB_DIMENSIONS {Dimensions for existing embedding deployment}`. Only needed if your embeddings model is not the default 'text-embedding-3-large'.
+1. Run `azd env set AZURE_OPENAI_EMB_DEPLOYMENT_VERSION {Version string for existing embedding deployment}`. If your embeddings deployment is one of the 'text-embedding-3' models, set this to the number 1.
+1. This project does *not* use keys when authenticating to Azure OpenAI. However, if your Azure OpenAI service must have key access enabled for some reason (like for use by other projects), then run `azd env set AZURE_OPENAI_DISABLE_KEYS false`. The default value is `true` so you should only run the command if you need key access.
 
 When you run `azd up` after and are prompted to select a value for `openAiResourceGroupLocation`, make sure to select the same location as the existing OpenAI resource group.
 
@@ -70,12 +78,12 @@ You can also customize the search service (new or existing) for non-English sear
 1. Run `azd env set AZURE_APPLICATION_INSIGHTS_DASHBOARD {Name of existing Azure App Insights Dashboard}`.
 1. Run `azd env set AZURE_LOG_ANALYTICS {Name of existing Azure Log Analytics Workspace Name}`.
 
-## Azure Computer Vision resources
+## Azure AI Vision resources
 
-1. Run `azd env set AZURE_COMPUTER_VISION_SERVICE {Name of existing Azure Computer Vision Service Name}`
-1. Run `azd env set AZURE_COMPUTER_VISION_RESOURCE_GROUP {Name of existing Azure Computer Vision Resource Group Name}`
-1. Run `azd env set AZURE_COMPUTER_VISION_LOCATION {Name of existing Azure Computer Vision Location}`
-1. Run `azd env set AZURE_COMPUTER_VISION_SKU {SKU of Azure Computer Vision service, defaults to F0}`
+1. Run `azd env set AZURE_VISION_SERVICE {Name of existing Azure AI Vision Service Name}`
+1. Run `azd env set AZURE_VISION_RESOURCE_GROUP {Name of existing Azure AI Vision Resource Group Name}`
+1. Run `azd env set AZURE_VISION_LOCATION {Name of existing Azure AI Vision Location}`
+1. Run `azd env set AZURE_VISION_SKU {SKU of Azure AI Vision service, defaults to F0}`
 
 ## Azure Document Intelligence resource
 

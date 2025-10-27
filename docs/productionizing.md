@@ -1,4 +1,4 @@
-# Productionizing the Chat App
+# RAG chat: Productionizing the app
 
 This sample is designed to be a starting point for your own production application,
 but you should do a thorough review of the security and performance before deploying
@@ -37,16 +37,36 @@ which you can specify using the `sku` property under the `storage` module in `in
 
 ### Azure AI Search
 
-The default search service uses the `Standard` SKU
-with the free semantic search option, which gives you 1000 free queries a month.
-Assuming your app will experience more than 1000 questions, you should either change `semanticSearch`
-to "standard" or disable semantic search entirely in the `/app/backend/approaches` files.
-If you see errors about search service capacity being exceeded, you may find it helpful to increase
+The default search service uses the "Basic" SKU
+with the free semantic ranker option, which gives you 1000 free queries a month.
+After 1000 queries, you will get an error message about exceeding the semantic ranker free capacity.
+
+* Assuming your app will experience more than 1000 questions per month,
+  you should upgrade the semantic ranker SKU from "free" to "standard" SKU:
+
+  ```shell
+  azd env set AZURE_SEARCH_SEMANTIC_RANKER standard
+  ```
+
+  Or disable semantic search entirely:
+
+  ```shell
+  azd env set AZURE_SEARCH_SEMANTIC_RANKER disabled
+  ```
+
+* The search service can handle fairly large indexes, but it does have per-SKU limits on storage sizes, maximum vector dimensions, etc. You may want to upgrade the SKU to either a Standard or Storage Optimized SKU, depending on your expected load.
+However, you [cannot change the SKU](https://learn.microsoft.com/azure/search/search-sku-tier#tier-upgrade-or-downgrade) of an existing search service, so you will need to re-index the data or manually copy it over.
+You can change the SKU by setting the `AZURE_SEARCH_SERVICE_SKU` azd environment variable to [an allowed SKU](https://learn.microsoft.com/azure/templates/microsoft.search/searchservices?pivots=deployment-language-bicep#sku).
+
+  ```shell
+  azd env set AZURE_SEARCH_SERVICE_SKU standard
+  ```
+
+  See the [Azure AI Search service limits documentation](https://learn.microsoft.com/azure/search/search-limits-quotas-capacity) for more details.
+
+* If you see errors about search service capacity being exceeded, you may find it helpful to increase
 the number of replicas by changing `replicaCount` in `infra/core/search/search-services.bicep`
 or manually scaling it from the Azure Portal.
-
-The search service can handle fairly large indexes, but it does have per-SKU limits on storage sizes, maximum vector dimensions, etc.
-See the [service limits document](https://learn.microsoft.com/azure/search/search-limits-quotas-capacity) for more details.
 
 ### Azure App Service
 
@@ -54,6 +74,15 @@ The default app service plan uses the `Basic` SKU with 1 CPU core and 1.75 GB RA
 We recommend using a Premium level SKU, starting with 1 CPU core.
 You can use auto-scaling rules or scheduled scaling rules,
 and scale up the maximum/minimum based on load.
+
+### Azure Container Apps
+
+The default container app uses a "Consumption" workload profile with 1 CPU core and 2 GB RAM,
+and scaling rules that allow for scaling all the way down to 0 replicas when idle.
+For production, consider either increasing the CPU cores and memory or
+[switching to a "Dedicated" workload profile](azure_container_apps.md#customizing-workload-profile),
+and configure the scaling rules to keep at least two replicas running at all times.
+Learn more in the [Azure Container Apps documentation](https://learn.microsoft.com/azure/container-apps).
 
 ## Additional security measures
 
@@ -63,7 +92,7 @@ and scale up the maximum/minimum based on load.
 * **Networking**: We recommend [deploying inside a Virtual Network](./deploy_private.md). If the app is only for
   internal enterprise use, use a private DNS zone. Also consider using Azure API Management (APIM)
   for firewalls and other forms of protection.
-  For more details, read [Azure OpenAI Landing Zone reference architecture](https://techcommunity.microsoft.com/t5/azure-architecture-blog/azure-openai-landing-zone-reference-architecture/ba-p/3882102).
+  For more details, read [Azure OpenAI Landing Zone reference architecture](https://techcommunity.microsoft.com/blog/azurearchitectureblog/azure-openai-landing-zone-reference-architecture/3882102).
 
 ## Load testing
 
@@ -71,19 +100,13 @@ We recommend running a loadtest for your expected number of users.
 You can use the [locust tool](https://docs.locust.io/) with the `locustfile.py` in this sample
 or set up a loadtest with Azure Load Testing.
 
-To use locust, first install the dev requirements that includes locust:
-
-```shell
-python -m pip install -r requirements-dev.txt
-```
-
-Or manually install locust:
+First make sure you have the locust package installed in your Python environment:
 
 ```shell
 python -m pip install locust
 ```
 
-Then run the locust command, specifying the name of the User class to use from `locustfile.py`. We've provided a `ChatUser` class that simulates a user asking questions and receiving answers, as well as a `ChatVisionUser` to simulate a user asking questions with the [GPT-4 vision mode enabled](/docs/gpt4v.md).
+Then run the locust command, specifying the name of the User class to use from `locustfile.py`. We've provided a `ChatUser` class that simulates a user asking questions and receiving answers.
 
 ```shell
 locust ChatUser

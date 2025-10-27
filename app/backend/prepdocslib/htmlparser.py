@@ -1,13 +1,14 @@
 import logging
 import re
-from typing import IO, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import IO
 
 from bs4 import BeautifulSoup
 
 from .page import Page
 from .parser import Parser
 
-logger = logging.getLogger("ingester")
+logger = logging.getLogger("scripts")
 
 
 def cleanup_data(data: str) -> str:

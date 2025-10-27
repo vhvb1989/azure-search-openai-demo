@@ -4,6 +4,12 @@
     height: 100%;
 }
 
+.main {
+    display: flex;
+    flex: 1;
+    min-height: 0; /* allow inner scroll areas to work inside flex container */
+}
+
 .header {
     background-color: #222222;
     color: #f2f2f2;
@@ -82,11 +88,6 @@
     display: none;
 }
 
-.microsoftLogo,
-.githubLogo {
-    display: none;
-}
-
 .menuToggle {
     display: block;
     background: none;
@@ -139,14 +140,6 @@
 
     .headerRightText {
         font-weight: normal;
-        display: inline-block;
-        vertical-align: middle;
-    }
-
-    .githubLogo,
-    .microsoftLogo {
-        height: 1.25rem;
-        font-weight: 600;
         display: inline-block;
         vertical-align: middle;
     }

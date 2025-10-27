@@ -1,6 +1,6 @@
 const BACKEND_URI = "";
 
-import { ChatAppResponse, ChatAppResponseOrError, ChatAppRequest, Config, SimpleAPIResponse } from "./models";
+import { ChatAppResponse, ChatAppResponseOrError, ChatAppRequest, Config, SimpleAPIResponse, HistoryListApiResponse, HistoryApiResponse } from "./models";
 import { useLogin, getToken, isUsingAppServicesLogin } from "../authConfig";
 
 export async function getHeaders(idToken: string | undefined): Promise<Record<string, string>> {
@@ -30,9 +30,12 @@ export async function askApi(request: ChatAppRequest, idToken: string | undefine
         body: JSON.stringify(request)
     });
 
-    const parsedResponse: ChatAppResponseOrError = await response.json();
     if (response.status > 299 || !response.ok) {
-        throw Error(parsedResponse.error || "Unknown error");
+        throw Error(`Request failed with status ${response.status}`);
+    }
+    const parsedResponse: ChatAppResponseOrError = await response.json();
+    if (parsedResponse.error) {
+        throw Error(parsedResponse.error);
     }
 
     return parsedResponse as ChatAppResponse;
@@ -76,7 +79,9 @@ export async function getSpeechApi(text: string): Promise<string | null> {
 }
 
 export function getCitationFilePath(citation: string): string {
-    return `${BACKEND_URI}/content/${citation}`;
+    // If there are parentheses at end of citation, remove part in parentheses
+    const cleanedCitation = citation.replace(/\s*\(.*?\)\s*$/, "").trim();
+    return `${BACKEND_URI}/content/${cleanedCitation}`;
 }
 
 export async function uploadFileApi(request: FormData, idToken: string): Promise<SimpleAPIResponse> {
@@ -122,4 +127,67 @@ export async function listUploadedFilesApi(idToken: string): Promise<string[]> {
 
     const dataResponse: string[] = await response.json();
     return dataResponse;
+}
+
+export async function postChatHistoryApi(item: any, idToken: string): Promise<any> {
+    const headers = await getHeaders(idToken);
+    const response = await fetch("/chat_history", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(item)
+    });
+
+    if (!response.ok) {
+        throw new Error(`Posting chat history failed: ${response.statusText}`);
+    }
+
+    const dataResponse: any = await response.json();
+    return dataResponse;
+}
+
+export async function getChatHistoryListApi(count: number, continuationToken: string | undefined, idToken: string): Promise<HistoryListApiResponse> {
+    const headers = await getHeaders(idToken);
+    let url = `${BACKEND_URI}/chat_history/sessions?count=${count}`;
+    if (continuationToken) {
+        url += `&continuationToken=${continuationToken}`;
+    }
+
+    const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { ...headers, "Content-Type": "application/json" }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Getting chat histories failed: ${response.statusText}`);
+    }
+
+    const dataResponse: HistoryListApiResponse = await response.json();
+    return dataResponse;
+}
+
+export async function getChatHistoryApi(id: string, idToken: string): Promise<HistoryApiResponse> {
+    const headers = await getHeaders(idToken);
+    const response = await fetch(`/chat_history/sessions/${id}`, {
+        method: "GET",
+        headers: { ...headers, "Content-Type": "application/json" }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Getting chat history failed: ${response.statusText}`);
+    }
+
+    const dataResponse: HistoryApiResponse = await response.json();
+    return dataResponse;
+}
+
+export async function deleteChatHistoryApi(id: string, idToken: string): Promise<any> {
+    const headers = await getHeaders(idToken);
+    const response = await fetch(`/chat_history/sessions/${id}`, {
+        method: "DELETE",
+        headers: { ...headers, "Content-Type": "application/json" }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Deleting chat history failed: ${response.statusText}`);
+    }
 }
